@@ -1,0 +1,41 @@
+plugins {
+    kotlin("jvm") version "2.0.0"
+    kotlin("plugin.spring") version "2.0.0"
+    id("org.springframework.boot") version "3.3.3"
+    id("io.spring.dependency-management") version "1.1.6"
+}
+
+group = "com.github.risboo6909"
+version = "1.0-SNAPSHOT"
+
+repositories {
+    mavenCentral()
+    maven { url = uri("https://jitpack.io") }
+}
+
+val ktorVersion = "3.0.0"
+
+dependencies {
+    implementation("com.github.ajalt.clikt:clikt:5.0.3")
+    implementation(platform("org.springframework.ai:spring-ai-bom:1.1.0-M1"))
+    implementation("org.springframework.boot:spring-boot-starter")
+    implementation("org.springframework:spring-web")
+    implementation("org.springframework.ai:spring-ai-starter-mcp-server")
+
+    implementation("io.ktor:ktor-client-core:$ktorVersion")
+    implementation("io.ktor:ktor-client-cio:$ktorVersion")
+}
+
+tasks.test {
+    useJUnitPlatform()
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
+kotlin {
+    jvmToolchain(21)
+}
