@@ -1,6 +1,6 @@
 package com.github.risboo6909.utils
 
-interface HttpHelperInterface {
+interface HttpClientInterface {
 
     suspend fun queryGet(url: String): String
 

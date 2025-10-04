@@ -10,23 +10,24 @@ import com.github.ajalt.clikt.parameters.types.int
 import org.springframework.boot.runApplication
 
 @SpringBootApplication
-class Application: CliktCommand(name = "lit-mcp") {
+class Application : CliktCommand(name = "lit-mcp") {
     private val transport by option("--transport", help = "stdio | http")
         .choice("stdio", "http").default("stdio")
 
     private val port by option("--port", help = "HTTP port").int().default(8080)
-    private val profile by option("--profile", help = "Spring profile (e.g. http|stdio)")
 
     override fun run() {
         val springArgs = mutableListOf<String>()
 
         val useStdio = (transport == "stdio")
         springArgs += "--spring.ai.mcp.server.stdio=$useStdio"
-        springArgs += "--spring.ai.mcp.server.protocol=" + if (useStdio) "NONE" else "SSE"
+        springArgs += "--spring.ai.mcp.server.protocol=" + if (useStdio) "STDIO" else "STREAMABLE"
 
-        springArgs += "--server.port=$port"
-
-        profile?.let { springArgs += "--spring.profiles.active=$it" }
+        if (useStdio) {
+            springArgs += "--spring.com.github.risboo6909.main.web-application-type=none"
+        } else {
+            springArgs += "--server.port=$port"
+        }
 
         runApplication<Application>(*springArgs.toTypedArray())
     }

@@ -8,7 +8,7 @@ import io.ktor.client.statement.bodyAsText
 import org.springframework.stereotype.Component
 
 @Component
-class HttpHelper: HttpHelperInterface {
+class HttpClient: HttpClientInterface {
 
     override suspend fun queryGet(url: String): String {
         val client = HttpClient(CIO)
