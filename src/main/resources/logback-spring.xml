@@ -1,0 +1,22 @@
+<configuration>
+
+  <!-- Console appender that writes to STDERR (suitable for MCP servers) -->
+  <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
+    <target>System.err</target>
+    <encoder>
+      <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} - %msg%n</pattern>
+      <immediateFlush>true</immediateFlush>
+    </encoder>
+  </appender>
+
+  <!-- Reduce noisy Spring logs -->
+  <logger name="org.springframework" level="WARN" />
+  <logger name="org.apache" level="WARN" />
+
+  <!-- Root logger sends to STDERR as well -->
+  <root level="INFO">
+    <appender-ref ref="STDERR" />
+  </root>
+
+</configuration>
+

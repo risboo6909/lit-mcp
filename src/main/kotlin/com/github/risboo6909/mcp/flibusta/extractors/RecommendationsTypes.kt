@@ -1,4 +1,4 @@
-package com.github.risboo6909.mcp.flibusta
+package com.github.risboo6909.mcp.flibusta.extractors
 
 data class AuthorRecommendation(
     val author: AuthorRef,

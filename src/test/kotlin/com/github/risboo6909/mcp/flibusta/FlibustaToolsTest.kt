@@ -16,9 +16,9 @@ class FlibustaToolsTest {
     @Test
     fun recommendationsByAuthor_returnsValidResponse_whenValidInput() = runBlocking {
         val rawHtml = "<html>valid recommendations</html>"
-        whenever(httpHelper.queryGet(any())).thenReturn(rawHtml)
+        whenever(httpHelper.queryGet(any<String>(), any())).thenReturn(rawHtml)
 
-        val response = flibustaTools.recommendationsByAuthor(10)
+        val response = flibustaTools.recommendationsByAuthor(10, 0)
 
         assertEquals(true, response.success)
         assertEquals("OK", response.message)
@@ -26,7 +26,7 @@ class FlibustaToolsTest {
 
     @Test
     fun recommendationsByAuthor_returnsError_whenRecommendationsExceedMax() = runBlocking {
-        val response = flibustaTools.recommendationsByAuthor(600)
+        val response = flibustaTools.recommendationsByAuthor(600, 0)
 
         assertEquals(false, response.success)
         assertEquals("Error: Maximum number of recommendations is 500", response.message)
@@ -34,7 +34,7 @@ class FlibustaToolsTest {
 
     @Test
     fun recommendationsByAuthor_returnsError_whenRecommendationsAreZero() = runBlocking {
-        val response = flibustaTools.recommendationsByAuthor(0)
+        val response = flibustaTools.recommendationsByAuthor(0, 0)
 
         assertEquals(false, response.success)
         assertEquals("Error: Number of recommendations must be greater than 0", response.message)
@@ -42,7 +42,7 @@ class FlibustaToolsTest {
 
     @Test
     fun recommendationsByAuthor_returnsError_whenRecommendationsAreNegative() = runBlocking {
-        val response = flibustaTools.recommendationsByAuthor(-5)
+        val response = flibustaTools.recommendationsByAuthor(-5, 0)
 
         assertEquals(false, response.success)
         assertEquals("Error: Number of recommendations must be greater than 0", response.message)
@@ -51,9 +51,9 @@ class FlibustaToolsTest {
     @Test
     fun recommendationsByBook_returnsValidResponse_whenValidInput() = runBlocking {
         val rawHtml = "<html>valid book recommendations</html>"
-        whenever(httpHelper.queryGet(any())).thenReturn(rawHtml)
+        whenever(httpHelper.queryGet(any<String>(), any())).thenReturn(rawHtml)
 
-        val response = flibustaTools.recommendationsByBook(10)
+        val response = flibustaTools.recommendationsByBook(10, 0)
 
         assertEquals(true, response.success)
         assertEquals("OK", response.message)
@@ -61,7 +61,7 @@ class FlibustaToolsTest {
 
     @Test
     fun recommendationsByBook_returnsError_whenRecommendationsExceedMax() = runBlocking {
-        val response = flibustaTools.recommendationsByBook(600)
+        val response = flibustaTools.recommendationsByBook(600, 0)
 
         assertEquals(false, response.success)
         assertEquals("Error: Maximum number of recommendations is 500", response.message)
@@ -69,7 +69,7 @@ class FlibustaToolsTest {
 
     @Test
     fun recommendationsByBook_returnsError_whenRecommendationsAreZero() = runBlocking {
-        val response = flibustaTools.recommendationsByBook(0)
+        val response = flibustaTools.recommendationsByBook(0, 0)
 
         assertEquals(false, response.success)
         assertEquals("Error: Number of recommendations must be greater than 0", response.message)
@@ -77,7 +77,7 @@ class FlibustaToolsTest {
 
     @Test
     fun recommendationsByBook_returnsError_whenRecommendationsAreNegative() = runBlocking {
-        val response = flibustaTools.recommendationsByBook(-1)
+        val response = flibustaTools.recommendationsByBook(-1, 0)
 
         assertEquals(false, response.success)
         assertEquals("Error: Number of recommendations must be greater than 0", response.message)

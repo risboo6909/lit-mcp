@@ -24,6 +24,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.ai:spring-ai-starter-mcp-server-webmvc:1.1.0-M1")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
     implementation("org.jsoup:jsoup:1.18.1")
 
     implementation("io.ktor:ktor-client-core:$ktorVersion")

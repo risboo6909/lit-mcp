@@ -1,20 +1,74 @@
 package com.github.risboo6909.utils
 
-import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.get
-import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.client.HttpClient
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import org.springframework.stereotype.Component
+import kotlin.math.min
+import kotlin.math.pow
+
+const val MAX_CONCURRENT_REQUESTS = 10
 
 @Component
 class HttpClient: HttpClientInterface {
 
-    override suspend fun queryGet(url: String): String {
-        val client = HttpClient(CIO)
-        val response: HttpResponse = client.get(url)
-        client.close()
-        return response.bodyAsText()
+    override suspend fun queryGet(url: String, retries: Int): String {
+        var attempt = 0
+        var lastError: Throwable? = null
+        val initialDelayMs = 200L
+
+        val retries = min(retries, 10)
+
+        while (attempt < retries) {
+            attempt++
+            val client = HttpClient(CIO)
+            try {
+                val response = client.get(url)
+                val text = response.bodyAsText()
+                return text
+            } catch (e: Throwable) {
+                lastError = e
+            } finally {
+                try {
+                    client.close()
+                } catch (_: Throwable) {
+                }
+            }
+
+            if (attempt >= retries) break
+
+            val delayMs = initialDelayMs * 2.0.pow(attempt - 1).toLong()
+            delay(delayMs)
+        }
+
+        throw (lastError ?: RuntimeException("Failed to fetch $url"))
+    }
+
+    override suspend fun fetchMultiplePages(urls: List<String>): List<String> {
+        val results = mutableListOf<String>()
+        val semaphore = kotlinx.coroutines.sync.Semaphore(MAX_CONCURRENT_REQUESTS)
+        coroutineScope {
+            val futures = urls.map { url ->
+                async {
+                    semaphore.acquire()
+                    try {
+                        queryGet(url)
+                    } catch (e: Exception) {
+                        // TODO: Handle exception properly
+                        ""
+                    } finally {
+                        semaphore.release()
+                    }
+                }
+            }
+            results.addAll(futures.awaitAll())
+        }
+        return results
     }
 
 }

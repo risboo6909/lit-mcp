@@ -23,10 +23,10 @@ class Application : CliktCommand(name = "lit-mcp") {
         springArgs += "--spring.ai.mcp.server.stdio=$useStdio"
         springArgs += "--spring.ai.mcp.server.protocol=" + if (useStdio) "STDIO" else "STREAMABLE"
 
-        if (useStdio) {
-            springArgs += "--spring.com.github.risboo6909.main.web-application-type=none"
+        springArgs += if (useStdio) {
+            "--spring.com.github.risboo6909.main.web-application-type=none"
         } else {
-            springArgs += "--server.port=$port"
+            "--server.port=$port"
         }
 
         runApplication<Application>(*springArgs.toTypedArray())
