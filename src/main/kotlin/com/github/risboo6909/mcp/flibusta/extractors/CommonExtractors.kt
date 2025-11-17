@@ -1,0 +1,26 @@
+package com.github.risboo6909.mcp.flibusta.extractors
+
+import org.jsoup.nodes.Element
+
+fun extractGenreInfo(e: Element): GenreRef {
+    return GenreRef(
+        id = extractIdFromHref(e.attr("href"), "/g"),
+        name = e.text().trim(),
+        url = e.absUrl("href").ifBlank { e.attr("href") },
+    )
+}
+
+fun extractAuthorInfo(e: Element, isTranslator: Boolean): AuthorRef {
+   return AuthorRef(
+       id = extractIdFromHref(e.attr("href"), "/a"),
+       name = e.text().trim(),
+       url = e.absUrl("href").ifBlank { e.attr("href") },
+       isTranslator = isTranslator,
+   )
+}
+
+fun extractIdFromHref(href: String, prefix: String): Int? {
+    val part = href.substringAfter("$prefix/", "")
+    val digits = part.takeWhile { it.isDigit() }
+    return digits.toIntOrNull()
+}

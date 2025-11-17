@@ -7,6 +7,9 @@ build:
 run: build
 	java -jar $(JAR_FILE) --transport=http
 
+npx_run:
+	npx @modelcontextprotocol/inspector
+
 clean:
 	$(GRADLEW) clean
 

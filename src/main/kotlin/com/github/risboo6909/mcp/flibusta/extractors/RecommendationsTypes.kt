@@ -17,17 +17,12 @@ data class BookRecommendation(
 data class AuthorRef(
     val id: Int?,
     val name: String,
-    val url: String
+    val url: String,
+    val isTranslator: Boolean
 )
 
 data class BookRef(
     val id: Int?,
     val title: String,
-    val url: String
-)
-
-data class GenreRef(
-    val id: Int?,
-    val name: String,
     val url: String
 )

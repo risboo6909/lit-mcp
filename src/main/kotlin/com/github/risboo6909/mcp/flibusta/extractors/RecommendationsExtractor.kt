@@ -5,6 +5,7 @@ import com.github.risboo6909.utils.joinParams
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 const val NO_PAGE_LIMIT = -1
@@ -13,7 +14,7 @@ const val RECOMMENDATIONS_URL = "$FLIBUSTA_BASE_URL/rec"
 class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
 
     companion object {
-        val LOG = LoggerFactory.getLogger(RecommendationsExtractor::class.java.name)
+        val LOG: Logger = LoggerFactory.getLogger(RecommendationsExtractor::class.java.name)
     }
 
     suspend fun getRecommendedBooks(
@@ -52,8 +53,8 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
         startPage: Int = 0
     ): List<T> {
         val allRecommendations = mutableListOf<T>()
-        var page = startPage
         val url = joinParams(RECOMMENDATIONS_URL, params)
+        var page = startPage
 
         while (recommendationsRequired == NO_PAGE_LIMIT ||
             allRecommendations.size < recommendationsRequired
@@ -120,7 +121,8 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
                 AuthorRef(
                     id = authorId,
                     name = authorName,
-                    url = authorUrl
+                    url = authorUrl,
+                    isTranslator = false,
                 ),
                 booksCount = extractInt(booksCell.text()),
                 usersCount = extractInt(usersCell.text()),
@@ -147,12 +149,8 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
             val genreCell = tds[2]
             val recsCell = tds[3]
 
-            val authors = authorCell.select("a[href^=/a/]").map { a ->
-                AuthorRef(
-                    id = extractIdFromHref(a.attr("href"), "/a"),
-                    name = a.text().trim(),
-                    url = a.absUrl("href").ifBlank { a.attr("href") }
-                )
+            val authors = authorCell.select("a[href^=/a/]").map {
+                extractAuthorInfo(it, false)
             }
 
             val bookA = bookCell.select("a[href^=/b/]").last() ?: return@mapNotNull null
@@ -162,12 +160,8 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
                 url = bookA.absUrl("href").ifBlank { bookA.attr("href") }
             )
 
-            val genres = genreCell.select("a[href^=/g/]").map { a ->
-                GenreRef(
-                    id = extractIdFromHref(a.attr("href"), "/g"),
-                    name = a.text().trim(),
-                    url = a.absUrl("href").ifBlank { a.attr("href") }
-                )
+            val genres = genreCell.select("a[href^=/g/]").map {
+                a -> extractGenreInfo(a)
             }
 
             val recs = extractFirstInt(recsCell.text())
@@ -183,10 +177,4 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
 
     private fun extractFirstInt(s: String): Int =
         Regex("""\d+""").find(s)?.value?.toInt() ?: 0
-
-    private fun extractIdFromHref(href: String, prefix: String): Int? {
-        val part = href.substringAfter("$prefix/", "")
-        val digits = part.takeWhile { it.isDigit() }
-        return digits.toIntOrNull()
-    }
 }
