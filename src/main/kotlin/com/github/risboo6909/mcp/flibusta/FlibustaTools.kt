@@ -16,14 +16,7 @@ const val FETCH_TIMEOUT_MILLIS: Long = 5 * 1000
 
 @Service
 class FlibustaTools(private val httpHelper: HttpClientInterface) {
-//
-//    @McpTool(name = "flibustaSearchByBookName", description = "[Flibusta] Search books by names")
-//    fun search(): String = runBlocking {
-//        val rawHtml = httpHelper.queryGet("https://flibusta.is/booksearch?ask=name&chb=on")
-//        val result = parseSearchResults(rawHtml)
-//        result.toString()
-//    }
-//
+
 //    @McpTool(name = "flibustaGenresList", description = "Get Flibusta genres")
 //    fun genres(): String = runBlocking {
 //        val rawHtml = httpHelper.queryGet("https://flibusta.is/g")
@@ -36,26 +29,34 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
     private val bookInfoExtractor = BookInfoExtractor(httpHelper)
 
     // -----
+//    @McpTool(
+//        name = "flibustaSearchByBookName",
+//        description = "[Flibusta] Search books by names")
+//    fun search(): String = runBlocking {
+//        val rawHtml = httpHelper.queryGet("https://flibusta.is/booksearch?ask=name&chb=on")
+//        "Hello"
+//        //val result = parseSearchResults(rawHtml)
+//        //result.toString()
+//    }
+
     @McpTool(
-        name = "flibustaGetBookInfoById",
+        name = "flibustaGetBookInfoByIds",
         description = "[Flibusta] Get book info by book ID",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
             destructiveHint = false,
             idempotentHint = true
         ))
-    fun getBookInfoById(
+    fun getBookInfoByIds(
         @McpToolParam(
             description = "Book ID from Flibusta",
         )
-        bookId: Int,
+        bookIds: List<Int>,
     ): McpResponse {
         return McpResponse(
-            true,
-            "OK",
-            runBlocking {
+            payload = runBlocking {
                 withTimeout(FETCH_TIMEOUT_MILLIS) {
-                    bookInfoExtractor.getBookInfoById(bookId)
+                    bookInfoExtractor.getBookInfoByIds(bookIds)
                 }
             }
         )
@@ -78,16 +79,13 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
 
         if (authorId <= 0) {
             return McpResponse(
-                false,
-                "Error: Author ID must be greater than 0"
+                errors = listOf("Error: Author ID must be greater than 0")
             )
         }
 
         return runBlocking {
             McpResponse(
-                success = true,
-                "OK",
-                withTimeout(FETCH_TIMEOUT_MILLIS) {
+                payload = withTimeout(FETCH_TIMEOUT_MILLIS) {
                     recExtractor.getRecommendedBooks(
                         mapOf(
                             "view" to "books",
@@ -124,9 +122,7 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
 
         return runBlocking {
             McpResponse(
-                success = true,
-                "OK",
-                withTimeout(FETCH_TIMEOUT_MILLIS) {
+                payload = withTimeout(FETCH_TIMEOUT_MILLIS) {
                     recExtractor.getRecommendedBooks(
                         mapOf(
                             "view" to "books",
@@ -162,9 +158,7 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
 
         return runBlocking {
             McpResponse(
-                success = true,
-                "OK",
-                withTimeout(FETCH_TIMEOUT_MILLIS) {
+                payload = withTimeout(FETCH_TIMEOUT_MILLIS) {
                     recExtractor.getRecommendedAuthors(
                         emptyMap(),
                         recommendationsRequired,
@@ -178,20 +172,17 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
     private fun validateRecommendationsRequest(recommendationsRequired: Int, startPage: Int): McpResponse? {
         if (recommendationsRequired > MAX_RECOMMENDATIONS) {
             return McpResponse(
-                false,
-                "Error: Maximum number of recommendations is $MAX_RECOMMENDATIONS"
+                errors = listOf("Error: Maximum number of recommendations is $MAX_RECOMMENDATIONS")
             )
         }
         if (recommendationsRequired <= 0) {
             return McpResponse(
-                false,
-                "Error: Number of recommendations must be greater than 0"
+                errors = listOf("Error: Number of recommendations must be greater than 0")
             )
         }
         if (startPage < 0) {
             return McpResponse(
-                false,
-                "Error: Start page must be 0 or greater"
+                errors = listOf("Error: Start page must be 0 or greater")
             )
         }
         return null

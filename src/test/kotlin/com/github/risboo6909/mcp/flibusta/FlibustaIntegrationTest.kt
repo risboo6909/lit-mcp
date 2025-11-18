@@ -26,26 +26,28 @@ class FlibustaIntegrationTest {
 
         // Try a quick request to the site root; if it fails — skip the test
         val reachable = try {
-            val root = httpClient.queryGet("https://flibusta.is", retries = 1)
+            val root = httpClient.queryGet("https://flibusta.is", retries = 3)
             root.isNotBlank()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
 
         assumeTrue(reachable, "Network unreachable or flibusta.is is not accessible — skipping integration test")
 
         val tools = FlibustaTools(httpClient)
-        val response: McpResponse = tools.getBookInfoById(776085)
+        val response: McpResponse = tools.getBookInfoByIds(listOf(776085))
 
-        assertTrue(response.success, "Expected success=true from getBookInfoById")
-        assertEquals("OK", response.message)
+        assertTrue(response.errors.isEmpty(), "Expected no errors, but got: ${response.errors}")
 
-        // Replace non-existent `result` with `payload` and handle nullable fields safely
-        val details = response.payload as? BookDetails
-        assertNotNull(details, "Expected payload to be BookDetails")
+        @Suppress("UNCHECKED_CAST")
+        val booksList = response.payload as? List<BookDetails>
+        assertNotNull(booksList, "Expected payload to be a list of BookDetails")
+        assertEquals(1, booksList!!.size, "Expected exactly 1 book in the response")
+
+        val details = booksList[0]
 
         // Safe check: downloads can be nullable
-        val downloadsNotEmpty = details!!.downloads?.isNotEmpty() ?: false
+        val downloadsNotEmpty = details.downloads?.isNotEmpty() ?: false
         assertTrue(
             downloadsNotEmpty || (details.coverUrl != null) || (details.annotation != null),
             "Expected at least downloads, coverUrl or annotation to be present for real book page"

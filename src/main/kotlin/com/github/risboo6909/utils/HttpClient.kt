@@ -1,5 +1,6 @@
 package com.github.risboo6909.utils
 
+import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsExtractor
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
@@ -8,6 +9,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Semaphore
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import kotlin.math.min
 import kotlin.math.pow
@@ -16,6 +20,10 @@ const val MAX_CONCURRENT_REQUESTS = 10
 
 @Component
 class HttpClient: HttpClientInterface {
+
+    companion object {
+        val LOG: Logger = LoggerFactory.getLogger(RecommendationsExtractor::class.java.name)
+    }
 
     override suspend fun queryGet(url: String, retries: Int): String {
         var attempt = 0
@@ -51,7 +59,8 @@ class HttpClient: HttpClientInterface {
 
     override suspend fun fetchMultiplePages(urls: List<String>): List<String> {
         val results = mutableListOf<String>()
-        val semaphore = kotlinx.coroutines.sync.Semaphore(MAX_CONCURRENT_REQUESTS)
+        val semaphore = Semaphore(MAX_CONCURRENT_REQUESTS)
+
         coroutineScope {
             val futures = urls.map { url ->
                 async {
@@ -59,7 +68,7 @@ class HttpClient: HttpClientInterface {
                     try {
                         queryGet(url)
                     } catch (e: Exception) {
-                        // TODO: Handle exception properly
+                        LOG.error("Error fetching $url, reason: $e")
                         ""
                     } finally {
                         semaphore.release()
@@ -68,6 +77,7 @@ class HttpClient: HttpClientInterface {
             }
             results.addAll(futures.awaitAll())
         }
+
         return results
     }
 
