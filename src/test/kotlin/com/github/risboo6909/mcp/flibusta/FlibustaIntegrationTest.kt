@@ -4,9 +4,9 @@ import com.github.risboo6909.mcp.McpResponse
 import com.github.risboo6909.mcp.flibusta.extractors.BookDetails
 import com.github.risboo6909.utils.HttpClient
 import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.*
 
 /**
  * Integration test: performs a real HTTP request and parses a Flibusta book page.
@@ -41,6 +41,7 @@ class FlibustaIntegrationTest {
 
         @Suppress("UNCHECKED_CAST")
         val booksList = response.payload as? List<BookDetails>
+
         assertNotNull(booksList, "Expected payload to be a list of BookDetails")
         assertEquals(1, booksList!!.size, "Expected exactly 1 book in the response")
 
@@ -50,7 +51,7 @@ class FlibustaIntegrationTest {
         val downloadsNotEmpty = details.downloads?.isNotEmpty() ?: false
         assertTrue(
             downloadsNotEmpty || (details.coverUrl != null) || (details.annotation != null),
-            "Expected at least downloads, coverUrl or annotation to be present for real book page"
+            "Expected at least downloads, coverUrl or annotation to be present for real book page",
         )
     }
 }

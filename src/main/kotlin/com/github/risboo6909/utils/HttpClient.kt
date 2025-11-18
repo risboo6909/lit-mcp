@@ -1,10 +1,10 @@
 package com.github.risboo6909.utils
 
 import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsExtractor
+import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
-import io.ktor.client.HttpClient
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -19,7 +19,7 @@ import kotlin.math.pow
 const val MAX_CONCURRENT_REQUESTS = 10
 
 @Component
-class HttpClient: HttpClientInterface {
+class HttpClient : HttpClientInterface {
 
     companion object {
         val LOG: Logger = LoggerFactory.getLogger(RecommendationsExtractor::class.java.name)
@@ -77,8 +77,6 @@ class HttpClient: HttpClientInterface {
             }
             results.addAll(futures.awaitAll())
         }
-
         return results
     }
-
 }

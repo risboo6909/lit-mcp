@@ -3,6 +3,7 @@ plugins {
     kotlin("plugin.spring") version "2.0.0"
     id("org.springframework.boot") version "3.3.3"
     id("io.spring.dependency-management") version "1.1.6"
+    id("com.diffplug.spotless") version "6.25.0"
 }
 
 group = "com.github.risboo6909"
@@ -49,4 +50,24 @@ java {
 
 kotlin {
     jvmToolchain(21)
+}
+
+spotless {
+    kotlin {
+        target("**/*.kt")
+        targetExclude("build/**/*.kt")
+        ktlint("1.0.1")
+            .editorConfigOverride(
+                mapOf(
+                    "indent_size" to "4",
+                    "max_line_length" to "120",
+                    "ktlint_standard_no-wildcard-imports" to "disabled",
+                    "ktlint_standard_filename" to "disabled",
+                ),
+            )
+    }
+    kotlinGradle {
+        target("*.gradle.kts")
+        ktlint("1.0.1")
+    }
 }

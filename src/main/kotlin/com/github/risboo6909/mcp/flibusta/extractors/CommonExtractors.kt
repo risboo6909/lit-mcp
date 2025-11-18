@@ -7,16 +7,17 @@ fun extractGenreInfo(e: Element): GenreRef {
         id = extractIdFromHref(e.attr("href"), "/g"),
         name = e.text().trim(),
         url = e.absUrl("href").ifBlank { e.attr("href") },
+        slug = e.attr("href").substringAfterLast('/'),
     )
 }
 
 fun extractAuthorInfo(e: Element, isTranslator: Boolean): AuthorRef {
-   return AuthorRef(
-       id = extractIdFromHref(e.attr("href"), "/a"),
-       name = e.text().trim(),
-       url = e.absUrl("href").ifBlank { e.attr("href") },
-       isTranslator = isTranslator,
-   )
+    return AuthorRef(
+        id = extractIdFromHref(e.attr("href"), "/a"),
+        name = e.text().trim(),
+        url = e.absUrl("href").ifBlank { e.attr("href") },
+        isTranslator = isTranslator,
+    )
 }
 
 fun extractIdFromHref(href: String, prefix: String): Int? {

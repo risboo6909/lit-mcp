@@ -9,7 +9,6 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 const val NO_PAGE_LIMIT = -1
-const val RECOMMENDATIONS_URL = "$FLIBUSTA_BASE_URL/rec"
 
 class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
 
@@ -20,28 +19,28 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
     suspend fun getRecommendedBooks(
         params: Map<String, String>,
         recommendationsRequired: Int = 10,
-        startPage: Int = 0
+        startPage: Int = 0,
     ): List<BookRecommendation> {
         return getRecommendationsSerial(
             httpHelper,
             ::parseRecommendedBooks,
             params,
             recommendationsRequired,
-            startPage
+            startPage,
         )
     }
 
     suspend fun getRecommendedAuthors(
         params: Map<String, String>,
         recommendationsRequired: Int = 10,
-        startPage: Int = 0
+        startPage: Int = 0,
     ): List<AuthorRecommendation> {
         return getRecommendationsSerial(
             httpHelper,
             ::parseRecommendedAuthors,
             params,
             recommendationsRequired,
-            startPage
+            startPage,
         )
     }
 
@@ -50,7 +49,7 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
         parser: (String) -> List<T>,
         params: Map<String, String>,
         recommendationsRequired: Int = 10,
-        startPage: Int = 0
+        startPage: Int = 0,
     ): List<T> {
         val allRecommendations = mutableListOf<T>()
         val url = joinParams(RECOMMENDATIONS_URL, params)
@@ -97,8 +96,7 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
 
         val rows = allRows.drop(1)
 
-        fun extractInt(text: String): Int =
-            Regex("""\d+""").find(text)?.value?.toInt() ?: 0
+        fun extractInt(text: String): Int = Regex("""\d+""").find(text)?.value?.toInt() ?: 0
 
         return rows.mapNotNull { tr ->
             val tds = tr.select("> td")
@@ -126,7 +124,7 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
                 ),
                 booksCount = extractInt(booksCell.text()),
                 usersCount = extractInt(usersCell.text()),
-                recsCount = extractInt(recsCell.text())
+                recsCount = extractInt(recsCell.text()),
             )
         }
     }
@@ -157,11 +155,12 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
             val book = BookRef(
                 id = extractIdFromHref(bookA.attr("href"), "/b"),
                 title = bookA.text().trim(),
-                url = bookA.absUrl("href").ifBlank { bookA.attr("href") }
+                url = bookA.absUrl("href").ifBlank { bookA.attr("href") },
             )
 
             val genres = genreCell.select("a[href^=/g/]").map {
-                a -> extractGenreInfo(a)
+                    a ->
+                extractGenreInfo(a)
             }
 
             val recs = extractFirstInt(recsCell.text())
@@ -170,11 +169,10 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
                 authors = authors,
                 book = book,
                 genres = genres,
-                recommendationsCount = recs
+                recommendationsCount = recs,
             )
         }
     }
 
-    private fun extractFirstInt(s: String): Int =
-        Regex("""\d+""").find(s)?.value?.toInt() ?: 0
+    private fun extractFirstInt(s: String): Int = Regex("""\d+""").find(s)?.value?.toInt() ?: 0
 }

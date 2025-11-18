@@ -6,20 +6,16 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.TextNode
 
-const val BOOKINFO_URL = "$FLIBUSTA_BASE_URL/b"
-
 class BookInfoExtractor(private val httpHelper: HttpClientInterface) {
 
-    suspend fun getBookInfoByIds(
-        bookIds: List<Int>,
-    ): List<BookDetails> {
+    suspend fun getBookInfoByIds(bookIds: List<Int>): List<BookDetails> {
         return httpHelper
-            .fetchMultiplePages(bookIds.map { "$BOOKINFO_URL/$it" })
+            .fetchMultiplePages(bookIds.map { "$BOOK_INFO_URL/$it" })
             .filter { !it.isEmpty() }
             .map { parse(it) }
     }
 
-    fun parse(rawHtml: String, baseUrl: String = FLIBUSTA_BASE_URL): BookDetails {
+    private fun parse(rawHtml: String, baseUrl: String = FLIBUSTA_BASE_URL): BookDetails {
         val doc = Jsoup.parse(rawHtml, baseUrl)
         return BookDetails(
             title = extractTitle(doc),
@@ -40,10 +36,9 @@ class BookInfoExtractor(private val httpHelper: HttpClientInterface) {
         return doc.selectFirst("h1.title")?.text()
     }
 
-    private fun extractDiscussions(doc: Document): List<String> =
-        doc.select("span[class^=container_]")
-            .map { it.text().trim() }
-            .filter { it.isNotEmpty() }
+    private fun extractDiscussions(doc: Document): List<String> = doc.select("span[class^=container_]")
+        .map { it.text().trim() }
+        .filter { it.isNotEmpty() }
 
     private fun extractAvgRating(doc: Document): Double? {
         val text = doc.selectFirst("#newann p")?.text() ?: return null
@@ -79,7 +74,7 @@ class BookInfoExtractor(private val httpHelper: HttpClientInterface) {
     private fun extractAnnotation(doc: Document): String? {
         val p = doc.selectFirst(
             "h2:containsOwn(Аннотация) + p, " +
-                    "h3:containsOwn(Аннотация) + p"
+                "h3:containsOwn(Аннотация) + p",
         )
         return p?.text()?.trim()
     }
@@ -97,15 +92,14 @@ class BookInfoExtractor(private val httpHelper: HttpClientInterface) {
         var isTranslator = false
 
         while (node != null) {
-
             if (node is Element &&
                 node.tagName() == "div" &&
-                node.classNames().any { it.startsWith("g-") }) {
+                node.classNames().any { it.startsWith("g-") }
+            ) {
                 break
             }
 
             when (node) {
-
                 is TextNode -> {
                     if (node.text().contains("перевод", ignoreCase = true)) {
                         isTranslator = true
@@ -147,4 +141,3 @@ class BookInfoExtractor(private val httpHelper: HttpClientInterface) {
         return doc.selectFirst("a[href*=$format]")?.absUrl("href")
     }
 }
-

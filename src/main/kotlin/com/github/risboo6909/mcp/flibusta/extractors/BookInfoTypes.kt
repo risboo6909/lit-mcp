@@ -15,9 +15,3 @@ data class BookDetails(
     val avgRating: Double?,
     val discussions: List<String>?,
 )
-
-data class GenreRef(
-    val id: Int?,
-    val name: String,
-    val url: String,
-)
