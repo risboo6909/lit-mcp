@@ -7,7 +7,10 @@ fun extractGenreInfo(e: Element): GenreRef {
         id = extractIdFromHref(e.attr("href"), "/g"),
         name = e.text().trim(),
         url = e.absUrl("href").ifBlank { e.attr("href") },
-        slug = e.attr("href").substringAfterLast('/'),
+        slug = e.attr("href")
+            .substringAfterLast('/')
+            // slug should not contain digits
+            .takeIf { it.all { ch -> !ch.isDigit() } },
     )
 }
 

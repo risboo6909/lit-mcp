@@ -15,15 +15,14 @@ class SearchBooksByName(private val httpHelper: HttpClientInterface) {
             val bookLink = li.selectFirst("a[href^=/b/]") ?: return@mapNotNull null
             val bookHref = bookLink.attr("href")
 
-            val bookId = bookHref.split("/").getOrNull(2)?.toIntOrNull()
+            val bookId = bookHref.substringAfterLast("/").toIntOrNull()
             val title = bookLink.text().trim()
             val fullBookUrl = bookLink.attr("abs:href")
 
             val authors = li.select("a[href^=/a/]").map { a ->
 
                 val href = a.attr("href")
-                val id = href.split("/").getOrNull(2)?.toIntOrNull()
-
+                val id = href.substringAfterLast("/").toIntOrNull()
                 AuthorRef(
                     id = id,
                     name = a.text().trim(),

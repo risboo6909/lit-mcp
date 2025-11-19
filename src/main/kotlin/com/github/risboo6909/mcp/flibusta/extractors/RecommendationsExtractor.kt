@@ -7,6 +7,7 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import kotlin.math.min
 
 const val NO_PAGE_LIMIT = -1
 
@@ -18,8 +19,8 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
 
     suspend fun getRecommendedBooks(
         params: Map<String, String>,
-        recommendationsRequired: Int = 10,
-        startPage: Int = 0,
+        recommendationsRequired: Int,
+        startPage: Int,
     ): List<BookRecommendation> {
         return getRecommendationsSerial(
             httpHelper,
@@ -32,8 +33,8 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
 
     suspend fun getRecommendedAuthors(
         params: Map<String, String>,
-        recommendationsRequired: Int = 10,
-        startPage: Int = 0,
+        recommendationsRequired: Int,
+        startPage: Int,
     ): List<AuthorRecommendation> {
         return getRecommendationsSerial(
             httpHelper,
@@ -48,8 +49,8 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
         httpHelper: HttpClientInterface,
         parser: (String) -> List<T>,
         params: Map<String, String>,
-        recommendationsRequired: Int = 10,
-        startPage: Int = 0,
+        recommendationsRequired: Int,
+        startPage: Int,
     ): List<T> {
         val allRecommendations = mutableListOf<T>()
         val url = joinParams(RECOMMENDATIONS_URL, params)
@@ -83,7 +84,10 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
             }
         }
 
-        return allRecommendations
+        return allRecommendations.subList(
+            0,
+            min(recommendationsRequired, allRecommendations.size),
+        )
     }
 
     private fun parseRecommendedAuthors(rawHtml: String): List<AuthorRecommendation> {
