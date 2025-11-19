@@ -17,34 +17,34 @@ class FlibustaToolsTest {
     fun recommendationsByAuthor_returnsValidResponse_whenValidInput() = runBlocking {
         val rawHtml = "<html>valid recommendations</html>"
         whenever(httpHelper.queryGet(any<String>(), any())).thenReturn(rawHtml)
-        val response = flibustaTools.getRecommendedAuthors(10, 0)
+        val response = flibustaTools.getRecommendedAuthors(0, 10)
 
         assertEquals(emptyList<String>(), response.errors)
     }
 
     @Test
-    fun recommendationsByAuthor_returnsError_whenRecommendationsExceedMax() = runBlocking {
-        val response = flibustaTools.getRecommendedAuthors(600, 0)
+    fun recommendationsByAuthor_returnsError_whenEndPageBeforeStartPage() = runBlocking {
+        val response = flibustaTools.getRecommendedAuthors(10, 5)
         assertEquals(
-            listOf("Error: Maximum number of recommendations is 500"),
+            listOf("Error: End page must be greater than start page"),
             response.errors,
         )
     }
 
     @Test
-    fun recommendationsByAuthor_returnsError_whenRecommendationsAreZero() = runBlocking {
-        val response = flibustaTools.getRecommendedAuthors(0, 0)
+    fun recommendationsByAuthor_returnsError_whenStartPageNegative() = runBlocking {
+        val response = flibustaTools.getRecommendedAuthors(-1, 1)
         assertEquals(
-            listOf("Error: Number of recommendations must be greater than 0"),
+            listOf("Error: Start page must be 0 or greater"),
             response.errors,
         )
     }
 
     @Test
-    fun recommendationsByAuthor_returnsError_whenRecommendationsAreNegative() = runBlocking {
-        val response = flibustaTools.getRecommendedAuthors(-5, 0)
+    fun recommendationsByAuthor_returnsError_whenEndPageNegative() = runBlocking {
+        val response = flibustaTools.getRecommendedAuthors(0, -1)
         assertEquals(
-            listOf("Error: Number of recommendations must be greater than 0"),
+            listOf("Error: End page must be 0 or greater"),
             response.errors,
         )
     }
@@ -53,37 +53,37 @@ class FlibustaToolsTest {
     fun recommendationsByBook_returnsValidResponse_whenValidInput() = runBlocking {
         val rawHtml = "<html>valid book recommendations</html>"
         whenever(httpHelper.queryGet(any<String>(), any())).thenReturn(rawHtml)
-        val response = flibustaTools.getRecommendedBooks(10, 0)
+        val response = flibustaTools.getRecommendedBooks(0, 10)
 
         assertEquals(emptyList<String>(), response.errors)
     }
 
     @Test
-    fun recommendationsByBook_returnsError_whenRecommendationsExceedMax() = runBlocking {
-        val response = flibustaTools.getRecommendedBooks(600, 0)
+    fun recommendationsByBook_returnsError_whenEndPageBeforeStartPage() = runBlocking {
+        val response = flibustaTools.getRecommendedBooks(10, 5)
 
         assertEquals(
-            listOf("Error: Maximum number of recommendations is 500"),
+            listOf("Error: End page must be greater than start page"),
             response.errors,
         )
     }
 
     @Test
-    fun recommendationsByBook_returnsError_whenRecommendationsAreZero() = runBlocking {
-        val response = flibustaTools.getRecommendedBooks(0, 0)
+    fun recommendationsByBook_returnsError_whenStartPageNegative() = runBlocking {
+        val response = flibustaTools.getRecommendedBooks(-1, 1)
 
         assertEquals(
-            listOf("Error: Number of recommendations must be greater than 0"),
+            listOf("Error: Start page must be 0 or greater"),
             response.errors,
         )
     }
 
     @Test
-    fun recommendationsByBook_returnsError_whenRecommendationsAreNegative() = runBlocking {
-        val response = flibustaTools.getRecommendedBooks(-1, 0)
+    fun recommendationsByBook_returnsError_whenEndPageNegative() = runBlocking {
+        val response = flibustaTools.getRecommendedBooks(0, -1)
 
         assertEquals(
-            listOf("Error: Number of recommendations must be greater than 0"),
+            listOf("Error: End page must be 0 or greater"),
             response.errors,
         )
     }

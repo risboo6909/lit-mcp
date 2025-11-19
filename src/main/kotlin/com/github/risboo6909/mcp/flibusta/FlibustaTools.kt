@@ -6,6 +6,7 @@ import com.github.risboo6909.mcp.flibusta.extractors.GenresListExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.SearchBooksByName
 import com.github.risboo6909.utils.HttpClientInterface
+import com.github.risboo6909.utils.joinListParams
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -15,8 +16,6 @@ import org.springframework.stereotype.Service
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
-const val MAX_RECOMMENDATIONS = 500
-const val DEFAULT_RECOMMENDATIONS = 10
 const val FETCH_TIMEOUT_MILLIS: Long = 15 * 1000 // Flibusta can be slow sometimes
 
 @Service
@@ -28,7 +27,7 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
     private val searchBookByName = SearchBooksByName(httpHelper)
 
     @McpTool(
-        name = "flibustaGenresList",
+        name = "flibustaGetGenresList",
         description = "[Flibusta] Get all available genres list",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
@@ -79,8 +78,28 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
     }
 
     @McpTool(
-        name = "flibustaRecommendedBooks",
-        description = "[Flibusta] Get recommended books",
+        name = "flibustaGetPopularBooksList",
+        description = "[Flibusta] Get top rated books list",
+        annotations = McpTool.McpAnnotations(
+            readOnlyHint = true,
+            destructiveHint = false,
+            idempotentHint = true,
+        ),
+    )
+    fun getPopularBooksList(
+        @McpToolParam(
+            description = "Period (day/week/all) to get popular books for. Default: all.",
+            required = false,
+        )
+        bookIds: List<Int>,
+    ): McpResponse = executeWithTimeout {
+        // TODO
+        bookInfoExtractor.getBookInfoByIds(bookIds)
+    }
+
+    @McpTool(
+        name = "flibustaGetRecommendedBooks",
+        description = "[Flibusta] Get recommended books paginated (50 items per page)",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
             destructiveHint = false,
@@ -89,17 +108,17 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
     )
     fun getRecommendedBooks(
         @McpToolParam(
-            description = "Max recommendations (max $MAX_RECOMMENDATIONS). Default: $DEFAULT_RECOMMENDATIONS.",
-            required = false,
-        )
-        recommendationsRequired: Int? = null,
-        @McpToolParam(
-            description = "Page index (0-based). Default: 0.",
+            description = "Start page index (0-based). Default: 0.",
             required = false,
         )
         startPage: Int? = null,
         @McpToolParam(
-            description = "Author name filter (optional). Default: none.",
+            description = "End page index (0-based, exclusive). Default: no limit.",
+            required = false,
+        )
+        endPage: Int? = null,
+        @McpToolParam(
+            description = "Author name filter (optional). Default: 1.",
             required = false,
         )
         authorName: String? = null,
@@ -109,15 +128,15 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
         )
         genreSlugs: List<String>? = null,
     ): McpResponse {
-        val recommendationsRequiredValue = recommendationsRequired ?: DEFAULT_RECOMMENDATIONS
         val startPageValue = startPage ?: 0
+        val endPageValue = endPage ?: 1
         val authorNameValue = URLEncoder.encode(
             authorName ?: "",
             StandardCharsets.UTF_8.toString(),
         )
-        val genreSlugsValue = (genreSlugs ?: emptyList()).joinToString(",")
+        val genreSlugsValue = joinListParams(genreSlugs, ",")
 
-        validateRecommendationsRequest(recommendationsRequiredValue, startPageValue)?.let { return it }
+        validateRecommendationsRequest(startPageValue, endPageValue)?.let { return it }
         return executeWithTimeout {
             recExtractor.getRecommendedBooks(
                 mapOf(
@@ -126,15 +145,15 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
                     "adata" to "name",
                     "author" to authorNameValue,
                 ),
-                recommendationsRequiredValue,
                 startPageValue,
+                endPageValue,
             )
         }
     }
 
     @McpTool(
         name = "flibustaRecommendedAuthors",
-        description = "[Flibusta] Get recommended authors",
+        description = "[Flibusta] Get recommended authors paginated (50 items per page)",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
             destructiveHint = false,
@@ -143,43 +162,52 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
     )
     fun getRecommendedAuthors(
         @McpToolParam(
-            description = "Max recommendations (max $MAX_RECOMMENDATIONS). Default: $DEFAULT_RECOMMENDATIONS.",
-            required = false,
-        )
-        recommendationsRequired: Int? = null,
-        @McpToolParam(
             description = "Page index (0-based). Default: 0.",
             required = false,
         )
         startPage: Int? = null,
+        @McpToolParam(
+            description = "End page index (0-based, exclusive). Default: 1.",
+            required = false,
+        )
+        endPage: Int? = null,
+        @McpToolParam(
+            description = "Genre slugs to filter by (optional). Default: none.",
+            required = false,
+        )
+        genreSlugs: List<String>? = null,
     ): McpResponse {
-        val recommendationsRequiredValue = recommendationsRequired ?: DEFAULT_RECOMMENDATIONS
         val startPageValue = startPage ?: 0
-        // TODO: Add genre selection
-        validateRecommendationsRequest(recommendationsRequiredValue, startPageValue)?.let { return it }
+        val endPageValue = endPage ?: 1
+        val genreSlugsValue = joinListParams(genreSlugs, ",")
+
+        validateRecommendationsRequest(startPageValue, endPageValue)?.let { return it }
         return executeWithTimeout {
             recExtractor.getRecommendedAuthors(
-                emptyMap(),
-                recommendationsRequiredValue,
+                mapOf(
+                    "view" to "authors",
+                    "srcgenre" to genreSlugsValue,
+                ),
                 startPageValue,
+                endPageValue,
             )
         }
     }
 
-    private fun validateRecommendationsRequest(recommendationsRequired: Int, startPage: Int): McpResponse? {
-        if (recommendationsRequired > MAX_RECOMMENDATIONS) {
-            return McpResponse(
-                errors = listOf("Error: Maximum number of recommendations is $MAX_RECOMMENDATIONS"),
-            )
-        }
-        if (recommendationsRequired <= 0) {
-            return McpResponse(
-                errors = listOf("Error: Number of recommendations must be greater than 0"),
-            )
-        }
+    private fun validateRecommendationsRequest(startPage: Int, endPage: Int): McpResponse? {
         if (startPage < 0) {
             return McpResponse(
                 errors = listOf("Error: Start page must be 0 or greater"),
+            )
+        }
+        if (endPage < 0) {
+            return McpResponse(
+                errors = listOf("Error: End page must be 0 or greater"),
+            )
+        }
+        if (endPage <= startPage) {
+            return McpResponse(
+                errors = listOf("Error: End page must be greater than start page"),
             )
         }
         return null

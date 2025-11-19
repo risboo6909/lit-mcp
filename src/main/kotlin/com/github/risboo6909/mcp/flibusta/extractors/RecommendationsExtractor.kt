@@ -1,15 +1,15 @@
 package com.github.risboo6909.mcp.flibusta.extractors
 
 import com.github.risboo6909.utils.HttpClientInterface
-import com.github.risboo6909.utils.joinParams
+import com.github.risboo6909.utils.joinKeyValueParams
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import kotlin.math.min
 
 const val NO_PAGE_LIMIT = -1
+const val RECOMMENDATIONS_PER_PAGE = 50
 
 class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
 
@@ -19,46 +19,51 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
 
     suspend fun getRecommendedBooks(
         params: Map<String, String>,
-        recommendationsRequired: Int,
         startPage: Int,
+        endPage: Int,
     ): List<BookRecommendation> {
         return getRecommendationsSerial(
             httpHelper,
             ::parseRecommendedBooks,
             params,
-            recommendationsRequired,
             startPage,
+            endPage,
         )
     }
 
     suspend fun getRecommendedAuthors(
         params: Map<String, String>,
-        recommendationsRequired: Int,
         startPage: Int,
+        endPage: Int,
     ): List<AuthorRecommendation> {
         return getRecommendationsSerial(
             httpHelper,
             ::parseRecommendedAuthors,
             params,
-            recommendationsRequired,
             startPage,
+            endPage,
         )
     }
 
+    /**
+     * This function fetches recommendation pages serially until it reaches the end page,
+     * or until the parser returns empty results or less than a full page of results.
+     *
+     * It may be slow for large page ranges, but is simple and avoids overwhelming the server.
+     * Parallel version could be implemented if needed.
+     */
     private suspend fun <T> getRecommendationsSerial(
         httpHelper: HttpClientInterface,
         parser: (String) -> List<T>,
         params: Map<String, String>,
-        recommendationsRequired: Int,
         startPage: Int,
+        endPage: Int,
     ): List<T> {
         val allRecommendations = mutableListOf<T>()
-        val url = joinParams(RECOMMENDATIONS_URL, params)
+        val url = joinKeyValueParams(RECOMMENDATIONS_URL, params)
         var page = startPage
 
-        while (recommendationsRequired == NO_PAGE_LIMIT ||
-            allRecommendations.size < recommendationsRequired
-        ) {
+        while (endPage == NO_PAGE_LIMIT || page < endPage) {
             val urlWithPage = if (url.contains("?")) {
                 url + "&page=${page++}"
             } else {
@@ -77,6 +82,13 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
                     break
                 }
                 allRecommendations.addAll(parsed)
+                if (parsed.size < RECOMMENDATIONS_PER_PAGE) {
+                    LOG.info(
+                        "Parser returned less than page size (${RECOMMENDATIONS_PER_PAGE})" +
+                            " results for page=$page url=$urlWithPage, stopping pagination",
+                    )
+                    break
+                }
             } catch (e: Exception) {
                 // Log HTTP or other fetch errors and stop
                 LOG.error("HTTP error while fetching url=$urlWithPage", e)
@@ -84,10 +96,7 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
             }
         }
 
-        return allRecommendations.subList(
-            0,
-            min(recommendationsRequired, allRecommendations.size),
-        )
+        return allRecommendations
     }
 
     private fun parseRecommendedAuthors(rawHtml: String): List<AuthorRecommendation> {
