@@ -1,5 +1,6 @@
 package com.github.risboo6909.mcp.flibusta.extractors
 
+import com.github.risboo6909.mcp.McpResponse
 import com.github.risboo6909.utils.HttpClientInterface
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
@@ -8,11 +9,12 @@ import org.jsoup.nodes.TextNode
 
 class BookInfoExtractor(private val httpHelper: HttpClientInterface) {
 
-    suspend fun getBookInfoByIds(bookIds: List<Int>): List<BookDetails> {
-        return httpHelper
-            .fetchMultiplePages(bookIds.map { "$BOOK_INFO_URL/$it" })
-            .filter { !it.isEmpty() }
-            .map { parse(it) }
+    suspend fun getBookInfoByIds(bookIds: List<Int>): McpResponse<List<BookDetails>> {
+        val result = httpHelper.fetchMultiplePages(bookIds.map { "$BOOK_INFO_URL/$it" })
+        return McpResponse(
+            result.first.filter { !it.isEmpty() }.map { parse(it) },
+            result.second,
+        )
     }
 
     private fun parse(rawHtml: String, baseUrl: String = FLIBUSTA_BASE_URL): BookDetails {
