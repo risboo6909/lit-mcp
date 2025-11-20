@@ -27,7 +27,7 @@ class FlibustaIntegrationTest {
         // Try a quick request to the site root; if it fails — skip the test
         val reachable = try {
             val root = httpClient.queryGet("https://flibusta.is", retries = 3)
-            root.isNotBlank()
+            root.getOrNull()?.isNotBlank() == true
         } catch (_: Exception) {
             false
         }
@@ -35,13 +35,11 @@ class FlibustaIntegrationTest {
         assumeTrue(reachable, "Network unreachable or flibusta.is is not accessible — skipping integration test")
 
         val tools = FlibustaTools(httpClient)
-        val response: McpResponse = tools.getBookInfoByIds(listOf(776085))
+        val response: McpResponse<List<BookDetails>> = tools.getBookInfoByIds(listOf(776085))
 
         assertTrue(response.errors.isEmpty(), "Expected no errors, but got: ${response.errors}")
 
-        @Suppress("UNCHECKED_CAST")
-        val booksList = response.payload as? List<BookDetails>
-
+        val booksList = response.payload
         assertNotNull(booksList, "Expected payload to be a list of BookDetails")
         assertEquals(1, booksList!!.size, "Expected exactly 1 book in the response")
 

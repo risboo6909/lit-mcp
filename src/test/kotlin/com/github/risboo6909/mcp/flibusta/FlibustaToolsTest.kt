@@ -16,8 +16,8 @@ class FlibustaToolsTest {
     @Test
     fun recommendationsByAuthor_returnsValidResponse_whenValidInput() = runBlocking {
         val rawHtml = "<html>valid recommendations</html>"
-        whenever(httpHelper.queryGet(any<String>(), any())).thenReturn(rawHtml)
-        val response = flibustaTools.getRecommendedAuthors(0, 10)
+        whenever(httpHelper.queryGet(any<String>(), any())).thenReturn(Result.success(rawHtml))
+        val response = flibustaTools.getRecommendedAuthors(0, 3)
 
         assertEquals(emptyList<String>(), response.errors)
     }
@@ -52,8 +52,8 @@ class FlibustaToolsTest {
     @Test
     fun recommendationsByBook_returnsValidResponse_whenValidInput() = runBlocking {
         val rawHtml = "<html>valid book recommendations</html>"
-        whenever(httpHelper.queryGet(any<String>(), any())).thenReturn(rawHtml)
-        val response = flibustaTools.getRecommendedBooks(0, 10)
+        whenever(httpHelper.queryGet(any<String>(), any())).thenReturn(Result.success(rawHtml))
+        val response = flibustaTools.getRecommendedBooks(0, 3)
 
         assertEquals(emptyList<String>(), response.errors)
     }

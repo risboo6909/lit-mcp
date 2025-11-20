@@ -9,8 +9,8 @@ class GenresListExtractor(private val httpHelper: HttpClientInterface) {
     suspend fun getAllGenres(): McpResponse<List<GenreRef>> {
         val result = httpHelper.queryGet(GENRES_LIST_URL)
         return McpResponse(
-            parse(result.getOrDefault("")),
-            result.exceptionOrNull()?.let {
+            payload = parse(result.getOrDefault("")),
+            errors = result.exceptionOrNull()?.let {
                 listOf(it.toString())
             } ?: listOf(),
         )
