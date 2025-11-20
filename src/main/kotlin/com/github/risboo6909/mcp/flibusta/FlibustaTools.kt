@@ -5,6 +5,7 @@ import com.github.risboo6909.mcp.flibusta.extractors.BookDetails
 import com.github.risboo6909.mcp.flibusta.extractors.BookInfoExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.GenreRef
 import com.github.risboo6909.mcp.flibusta.extractors.GenresListExtractor
+import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsResponse
 import com.github.risboo6909.mcp.flibusta.extractors.SearchBookRef
@@ -30,6 +31,7 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
     private val bookInfoExtractor = BookInfoExtractor(httpHelper)
     private val genresExtractor = GenresListExtractor(httpHelper)
     private val searchBookByName = SearchBooksByName(httpHelper)
+    private val popularBooksExtractor = PopularBooksExtractor(httpHelper)
 
     @McpTool(
         name = "flibustaGetGenresList",

@@ -24,7 +24,7 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
         startPage: Int,
         endPage: Int,
     ): McpResponse<RecommendationsResponse> {
-        val (payload, isLastPage, errors) = getRecommendationsSerial(
+        val (payload, isLastPage, errors) = getRecommendationsParallel(
             httpHelper,
             ::parseRecommendedBooks,
             params,
@@ -45,7 +45,7 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
         startPage: Int,
         endPage: Int,
     ): McpResponse<RecommendationsResponse> {
-        val (payload, isLastPage, errors) = getRecommendationsSerial(
+        val (payload, isLastPage, errors) = getRecommendationsParallel(
             httpHelper,
             ::parseRecommendedAuthors,
             params,
@@ -64,32 +64,34 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
     // Helper to process raw HTML and update recommendations list
     private fun <T> processRawHtml(
         allRecommendations: MutableList<T>,
+        allErrors: MutableList<String>,
         url: String,
         rawHtml: String,
         parser: (String) -> List<T>,
     ): Boolean {
-        try {
-            val parsed = try {
-                parser(rawHtml)
-            } catch (pe: Throwable) {
-                LOG.error("Parser error while parsing page for url=$url, skipping this page", pe)
-                return false
-            }
-
-            allRecommendations.addAll(parsed)
-
-            if (parsed.size < RECOMMENDATIONS_PER_PAGE) {
-                LOG.info(
-                    "Parser returned less than page size (${RECOMMENDATIONS_PER_PAGE})" +
-                        " results for url=$url, stopping pagination",
-                )
-                return true
-            }
-        } catch (e: Exception) {
-            // Log HTTP or other fetch errors and stop
-            LOG.error("HTTP error while fetching url=$url", e)
+        val parsed = try {
+            parser(rawHtml)
+        } catch (pe: Throwable) {
+            logAndCollectError(
+                LOG,
+                allErrors,
+                "Parser error while parsing page for url=$url, " +
+                    "skipping this page",
+                pe,
+            )
             return false
         }
+
+        allRecommendations.addAll(parsed)
+
+        if (parsed.size < RECOMMENDATIONS_PER_PAGE) {
+            LOG.info(
+                "Parser returned less than page size (${RECOMMENDATIONS_PER_PAGE})" +
+                    " results for url=$url, stopping pagination",
+            )
+            return true
+        }
+
         return false
     }
 
@@ -99,8 +101,9 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
         params: Map<String, String>,
         startPage: Int,
         endPage: Int,
-    ): Pair<List<T>, Boolean> {
+    ): Triple<List<T>, Boolean, List<String>> {
         val allRecommendations = mutableListOf<T>()
+        val parseErrors = mutableListOf<String>()
         val url = joinKeyValueParams(RECOMMENDATIONS_URL, params)
 
         var page = startPage
@@ -113,12 +116,12 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
             }
         }
 
-        val (payloads, errors) = httpHelper.fetchMultiplePages(urls)
+        val (payloads, networkErrors) = httpHelper.fetchMultiplePages(urls)
         val containsLastPage = payloads.map {
-            processRawHtml(allRecommendations, url, it, parser)
+            processRawHtml(allRecommendations, parseErrors, url, it, parser)
         }.any { it }
 
-        return Pair(allRecommendations, containsLastPage)
+        return Triple(allRecommendations, containsLastPage, parseErrors + networkErrors)
     }
 
     /**
@@ -161,27 +164,8 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
                 continue
             }
 
-            val parsed = try {
-                parser(rawHtml)
-            } catch (pe: Throwable) {
-                logAndCollectError(
-                    LOG,
-                    allErrors,
-                    "Parser error while parsing page=$page url=$urlWithPage, skipping this page",
-                    pe,
-                )
-                page++
-                continue
-            }
-
-            allRecommendations.addAll(parsed)
-
-            if (parsed.size < RECOMMENDATIONS_PER_PAGE) {
+            if (processRawHtml(allRecommendations, allErrors, url, rawHtml, parser)) {
                 isLastPage = true
-                LOG.info(
-                    "Parser returned ${parsed.size} results (less than $RECOMMENDATIONS_PER_PAGE) " +
-                        "for page=$page url=$urlWithPage, stopping pagination",
-                )
                 break
             }
 

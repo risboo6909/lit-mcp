@@ -38,9 +38,9 @@ class HttpClient : HttpClientInterface {
         var lastError: Throwable? = null
         val initialDelayMs = 200L
 
-        val retries = min(retries, MAX_RETRIES)
+        val attempts = min(retries, MAX_RETRIES)
 
-        while (attempt < retries) {
+        while (attempt < attempts) {
             attempt++
             try {
                 return Result.success(ktorClient.get(url).bodyAsText())
@@ -48,40 +48,41 @@ class HttpClient : HttpClientInterface {
                 lastError = e
             }
 
-            if (attempt >= retries) break
+            if (attempt >= attempts) break
 
             val delayMs = initialDelayMs * 2.0.pow(attempt - 1)
                 .toLong()
                 .coerceAtMost(8000)
 
-            LOG.info("Retrying $url in ${delayMs}ms (attempt ${attempt + 1}/$retries)")
-
+            LOG.info("Retrying $url in ${delayMs}ms (attempt ${attempt + 1}/$attempts)")
             delay(delayMs)
         }
-
         return Result.failure(lastError ?: RuntimeException("Failed to fetch $url"))
     }
 
     override suspend fun fetchMultiplePages(urls: List<String>): Pair<List<String>, List<String>> {
-        val results = mutableListOf<String>()
-        val errors = mutableListOf<String>()
         val semaphore = Semaphore(MAX_CONCURRENT_REQUESTS)
-
-        coroutineScope {
-            val futures = urls.map { url ->
+        val pairs = coroutineScope {
+            urls.map { url ->
                 async {
                     semaphore.acquire()
-                    val res = queryGet(url)
-                    semaphore.release()
-                    res.getOrElse {
-                        errors.add("Error fetching $url, reason: ${res.exceptionOrNull()}")
-                        // return empty string on error
-                        ""
+                    try {
+                        val res = queryGet(url)
+                        if (res.isSuccess) {
+                            res.getOrNull().orEmpty() to null
+                        } else {
+                            val err = res.exceptionOrNull()
+                            LOG.error("Error fetching $url", err)
+                            "" to "Error fetching $url, reason: ${err?.message}"
+                        }
+                    } finally {
+                        semaphore.release()
                     }
                 }
-            }
-            results.addAll(futures.awaitAll())
+            }.awaitAll()
         }
-        return Pair(results, errors)
+        val results = pairs.map { it.first }
+        val errors = pairs.mapNotNull { it.second }
+        return results to errors
     }
 }
