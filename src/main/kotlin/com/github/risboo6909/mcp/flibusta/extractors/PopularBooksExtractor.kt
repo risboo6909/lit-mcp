@@ -38,19 +38,14 @@ class PopularBooksExtractor(private val httpHelper: HttpClientInterface) {
 
         return listItems.mapNotNull { li ->
             val bookLink = li.selectFirst("a[href^=/b/]") ?: return@mapNotNull null
-
-            val bookHref = bookLink.attr("href")
-            // TODO: extract this to common method
-            val bookUrl = bookLink.absUrl("href").ifBlank { bookHref }
-            val bookId = bookHref.substringAfterLast('/').toIntOrNull()
-            val bookTitle = bookLink.text().trim()
+            val book = extractBookInfo(bookLink)
 
             val authors = li.select("a[href^=/a/]").map { a ->
                 extractAuthorInfo(a, false)
             }
 
             PopularBook(
-                book = null,
+                book = book,
                 authors = authors,
             )
         }

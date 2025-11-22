@@ -128,11 +128,7 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
             }
 
             val bookA = bookCell.select("a[href^=/b/]").last() ?: return@mapNotNull null
-            val book = BookInfo(
-                id = extractIdFromHref(bookA.attr("href"), "/b"),
-                title = bookA.text().trim(),
-                url = bookA.absUrl("href").ifBlank { bookA.attr("href") },
-            )
+            val book = extractBookInfo(bookA)
 
             val genres = genreCell.select("a[href^=/g/]").map { a ->
                 extractGenreInfo(a)

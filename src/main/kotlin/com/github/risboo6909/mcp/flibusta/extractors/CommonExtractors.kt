@@ -23,6 +23,14 @@ fun extractAuthorInfo(e: Element, isTranslator: Boolean): AuthorInfo {
     )
 }
 
+fun extractBookInfo(e: Element): BookInfo {
+    return BookInfo(
+        id = extractIdFromHref(e.attr("href"), "/b"),
+        title = e.text().trim(),
+        url = e.absUrl("href").ifBlank { e.attr("href") },
+    )
+}
+
 fun extractIdFromHref(href: String, prefix: String): Int? {
     val part = href.substringAfter("$prefix/", "")
     val digits = part.takeWhile { it.isDigit() }
