@@ -6,7 +6,7 @@ import org.jsoup.Jsoup
 
 class GenresListExtractor(private val httpHelper: HttpClientInterface) {
 
-    suspend fun getAllGenres(): McpResponse<List<GenreRef>> {
+    suspend fun getAllGenres(): McpResponse<List<GenreInfo>> {
         val result = httpHelper.queryGet(GENRES_LIST_URL)
         return McpResponse(
             payload = parse(result.getOrDefault("")),
@@ -16,7 +16,7 @@ class GenresListExtractor(private val httpHelper: HttpClientInterface) {
         )
     }
 
-    private fun parse(rawHtml: String, baseUrl: String = FLIBUSTA_BASE_URL): List<GenreRef> {
+    private fun parse(rawHtml: String, baseUrl: String = FLIBUSTA_BASE_URL): List<GenreInfo> {
         val doc = Jsoup.parse(rawHtml, baseUrl)
 
         return doc.select("h1.title:matchesOwn(Список жанров) ~ ul > li")

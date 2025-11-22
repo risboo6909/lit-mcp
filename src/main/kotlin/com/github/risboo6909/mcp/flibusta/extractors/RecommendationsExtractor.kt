@@ -2,6 +2,7 @@ package com.github.risboo6909.mcp.flibusta.extractors
 
 import com.github.risboo6909.mcp.McpResponse
 import com.github.risboo6909.utils.HttpClientInterface
+import com.github.risboo6909.utils.addPagination
 import com.github.risboo6909.utils.joinKeyValueParams
 import com.github.risboo6909.utils.logAndCollectError
 import org.jsoup.Jsoup
@@ -10,7 +11,6 @@ import org.jsoup.nodes.Element
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-const val NO_PAGE_LIMIT = -1
 const val RECOMMENDATIONS_PER_PAGE = 50
 
 class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
@@ -106,14 +106,8 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
         val parseErrors = mutableListOf<String>()
         val url = joinKeyValueParams(RECOMMENDATIONS_URL, params)
 
-        var page = startPage
-
         val urls = (startPage until endPage).map {
-            if (url.contains("?")) {
-                url + "&page=${page++}"
-            } else {
-                url + "?page=${page++}"
-            }
+            addPagination(url, it)
         }
 
         val (payloads, networkErrors) = httpHelper.fetchMultiplePages(urls)
@@ -144,13 +138,8 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
         var isLastPage = false
         var page = startPage
 
-        while (endPage == NO_PAGE_LIMIT || page < endPage) {
-            val urlWithPage = if (url.contains("?")) {
-                "$url&page=$page"
-            } else {
-                "$url?page=$page"
-            }
-
+        while (page < endPage) {
+            val urlWithPage = addPagination(url, page)
             val rawHtml = try {
                 httpHelper.queryGet(urlWithPage).getOrThrow()
             } catch (e: Exception) {
@@ -205,7 +194,7 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
                 .toIntOrNull()
 
             AuthorRecommendation(
-                AuthorRef(
+                AuthorInfo(
                     id = authorId,
                     name = authorName,
                     url = authorUrl,
@@ -241,7 +230,7 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
             }
 
             val bookA = bookCell.select("a[href^=/b/]").last() ?: return@mapNotNull null
-            val book = BookRef(
+            val book = BookInfo(
                 id = extractIdFromHref(bookA.attr("href"), "/b"),
                 title = bookA.text().trim(),
                 url = bookA.absUrl("href").ifBlank { bookA.attr("href") },

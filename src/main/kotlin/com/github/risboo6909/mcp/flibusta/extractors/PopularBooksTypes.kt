@@ -5,3 +5,8 @@ enum class PopularBooksPeriod(url: String) {
     WEEK("/stat/w"),
     ALL_TIME("/stat/b"),
 }
+
+data class PopularBook(
+    val book: BookInfo?,
+    val authors: List<AuthorInfo>?,
+)

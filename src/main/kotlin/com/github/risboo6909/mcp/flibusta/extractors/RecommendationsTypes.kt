@@ -10,15 +10,15 @@ data class RecommendationsResponse(
 )
 
 data class AuthorRecommendation(
-    val author: AuthorRef,
+    val author: AuthorInfo,
     val booksCount: Int,
     val usersCount: Int,
     val recsCount: Int,
 )
 
 data class BookRecommendation(
-    val authors: List<AuthorRef>,
-    val book: BookRef,
-    val genres: List<GenreRef>,
+    val authors: List<AuthorInfo>,
+    val book: BookInfo,
+    val genres: List<GenreInfo>,
     val recommendationsCount: Int,
 )

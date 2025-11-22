@@ -86,8 +86,8 @@ class BookInfoExtractor(private val httpHelper: HttpClientInterface) {
             .selectFirst("img[alt='Cover image']")?.attr("abs:src")
     }
 
-    private fun extractAuthors(doc: Document): List<AuthorRef> {
-        val result = mutableListOf<AuthorRef>()
+    private fun extractAuthors(doc: Document): List<AuthorInfo> {
+        val result = mutableListOf<AuthorInfo>()
         val title = doc.selectFirst("h1.title") ?: return result
 
         var node = title.nextSibling()
@@ -121,7 +121,7 @@ class BookInfoExtractor(private val httpHelper: HttpClientInterface) {
         return result
     }
 
-    private fun extractGenres(doc: Document): List<GenreRef> {
+    private fun extractGenres(doc: Document): List<GenreInfo> {
         return doc.select("a.genre").map {
             extractGenreInfo(it)
         }

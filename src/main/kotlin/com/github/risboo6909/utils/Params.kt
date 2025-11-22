@@ -18,3 +18,11 @@ fun joinListParams(xs: List<String>?, separator: String): String {
         URLEncoder.encode(item, StandardCharsets.UTF_8.toString())
     }
 }
+
+fun addPagination(url: String, page: Int): String {
+    return if (url.contains("?")) {
+        url + "&page=$page"
+    } else {
+        url + "?page=$page"
+    }
+}

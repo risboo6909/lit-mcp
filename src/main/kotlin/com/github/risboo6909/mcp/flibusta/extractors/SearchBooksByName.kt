@@ -30,7 +30,7 @@ class SearchBooksByName(private val httpHelper: HttpClientInterface) {
 
                 val href = a.attr("href")
                 val id = href.substringAfterLast("/").toIntOrNull()
-                AuthorRef(
+                AuthorInfo(
                     id = id,
                     name = a.text().trim(),
                     url = a.attr("abs:href"),

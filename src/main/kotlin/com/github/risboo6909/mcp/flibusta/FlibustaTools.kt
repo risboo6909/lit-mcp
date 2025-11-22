@@ -3,7 +3,7 @@ package com.github.risboo6909.mcp.flibusta
 import com.github.risboo6909.mcp.McpResponse
 import com.github.risboo6909.mcp.flibusta.extractors.BookDetails
 import com.github.risboo6909.mcp.flibusta.extractors.BookInfoExtractor
-import com.github.risboo6909.mcp.flibusta.extractors.GenreRef
+import com.github.risboo6909.mcp.flibusta.extractors.GenreInfo
 import com.github.risboo6909.mcp.flibusta.extractors.GenresListExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsExtractor
@@ -42,7 +42,7 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
             idempotentHint = true,
         ),
     )
-    fun getGenresList(): McpResponse<List<GenreRef>> = executeWithTimeout {
+    fun getGenresList(): McpResponse<List<GenreInfo>> = executeWithTimeout {
         genresExtractor.getAllGenres()
     }
 

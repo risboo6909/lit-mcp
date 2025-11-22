@@ -4,8 +4,8 @@ data class DownloadLink(val format: String, val url: String)
 
 data class BookDetails(
     val title: String?,
-    val authors: List<AuthorRef>?,
-    val genres: List<GenreRef>?,
+    val authors: List<AuthorInfo>?,
+    val genres: List<GenreInfo>?,
     val publishYear: Int?,
     val pagesNum: Int?,
     val downloads: List<DownloadLink>?,
