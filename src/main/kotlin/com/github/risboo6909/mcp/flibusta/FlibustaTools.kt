@@ -5,7 +5,9 @@ import com.github.risboo6909.mcp.flibusta.extractors.BookDetails
 import com.github.risboo6909.mcp.flibusta.extractors.BookInfoExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.GenreInfo
 import com.github.risboo6909.mcp.flibusta.extractors.GenresListExtractor
+import com.github.risboo6909.mcp.flibusta.extractors.PopularBook
 import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksExtractor
+import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksPeriod
 import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsResponse
 import com.github.risboo6909.mcp.flibusta.extractors.SearchBookRef
@@ -95,13 +97,25 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
     )
     fun getPopularBooksList(
         @McpToolParam(
+            description = "Start page index (0-based). Default: 0",
+            required = false,
+        )
+        startPage: Int? = null,
+        @McpToolParam(
+            description = "End page index (0-based, exclusive). Default: 1",
+            required = false,
+        )
+        endPage: Int? = null,
+        @McpToolParam(
             description = "Period (day/week/all) to get popular books for. Default: all.",
             required = false,
         )
-        bookIds: List<Int>,
-    ): McpResponse<List<BookDetails>> = executeWithTimeout {
-        // TODO: implement popular books extractor
-        bookInfoExtractor.getBookInfoByIds(bookIds)
+        period: PopularBooksPeriod?,
+    ): McpResponse<List<PopularBook>> = executeWithTimeout {
+        val startPageValue = startPage ?: 0
+        val endPageValue = endPage ?: 1
+        val periodValue = period ?: PopularBooksPeriod.ALL_TIME
+        popularBooksExtractor.getPopularBooks(periodValue, startPageValue, endPageValue)
     }
 
     @McpTool(

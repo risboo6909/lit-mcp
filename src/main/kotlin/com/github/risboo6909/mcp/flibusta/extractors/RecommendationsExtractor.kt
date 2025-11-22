@@ -2,9 +2,6 @@ package com.github.risboo6909.mcp.flibusta.extractors
 
 import com.github.risboo6909.mcp.McpResponse
 import com.github.risboo6909.utils.HttpClientInterface
-import com.github.risboo6909.utils.addPagination
-import com.github.risboo6909.utils.joinKeyValueParams
-import com.github.risboo6909.utils.logAndCollectError
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
@@ -24,7 +21,9 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
         startPage: Int,
         endPage: Int,
     ): McpResponse<RecommendationsResponse> {
-        val (payload, isLastPage, errors) = getRecommendationsParallel(
+        val (payload, isLastPage, errors) = getWithPaginationParallel(
+            RECOMMENDATIONS_URL,
+            RECOMMENDATIONS_PER_PAGE,
             httpHelper,
             ::parseRecommendedBooks,
             params,
@@ -45,7 +44,9 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
         startPage: Int,
         endPage: Int,
     ): McpResponse<RecommendationsResponse> {
-        val (payload, isLastPage, errors) = getRecommendationsParallel(
+        val (payload, isLastPage, errors) = getWithPaginationParallel(
+            RECOMMENDATIONS_URL,
+            RECOMMENDATIONS_PER_PAGE,
             httpHelper,
             ::parseRecommendedAuthors,
             params,
@@ -59,109 +60,6 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
             ),
             errors,
         )
-    }
-
-    // Helper to process raw HTML and update recommendations list
-    private fun <T> processRawHtml(
-        allRecommendations: MutableList<T>,
-        allErrors: MutableList<String>,
-        url: String,
-        rawHtml: String,
-        parser: (String) -> List<T>,
-    ): Boolean {
-        val parsed = try {
-            parser(rawHtml)
-        } catch (pe: Throwable) {
-            logAndCollectError(
-                LOG,
-                allErrors,
-                "Parser error while parsing page for url=$url, " +
-                    "skipping this page",
-                pe,
-            )
-            return false
-        }
-
-        allRecommendations.addAll(parsed)
-
-        if (parsed.size < RECOMMENDATIONS_PER_PAGE) {
-            LOG.info(
-                "Parser returned less than page size (${RECOMMENDATIONS_PER_PAGE})" +
-                    " results for url=$url, stopping pagination",
-            )
-            return true
-        }
-
-        return false
-    }
-
-    private suspend fun <T> getRecommendationsParallel(
-        httpHelper: HttpClientInterface,
-        parser: (String) -> List<T>,
-        params: Map<String, String>,
-        startPage: Int,
-        endPage: Int,
-    ): Triple<List<T>, Boolean, List<String>> {
-        val allRecommendations = mutableListOf<T>()
-        val parseErrors = mutableListOf<String>()
-        val url = joinKeyValueParams(RECOMMENDATIONS_URL, params)
-
-        val urls = (startPage until endPage).map {
-            addPagination(url, it)
-        }
-
-        val (payloads, networkErrors) = httpHelper.fetchMultiplePages(urls)
-        val containsLastPage = payloads.map {
-            processRawHtml(allRecommendations, parseErrors, url, it, parser)
-        }.any { it }
-
-        return Triple(allRecommendations, containsLastPage, parseErrors + networkErrors)
-    }
-
-    /**
-     * This function fetches recommendation pages serially until it reaches the end page,
-     * or until the parser returns empty results or less than a full page of results.
-     *
-     * It may be slow for large page ranges, use parallel version instead.
-     */
-    private suspend fun <T> getRecommendationsSerial(
-        httpHelper: HttpClientInterface,
-        parser: (String) -> List<T>,
-        params: Map<String, String>,
-        startPage: Int,
-        endPage: Int,
-    ): Triple<List<T>, Boolean, List<String>> {
-        val allRecommendations = mutableListOf<T>()
-        val allErrors = mutableListOf<String>()
-        val url = joinKeyValueParams(RECOMMENDATIONS_URL, params)
-
-        var isLastPage = false
-        var page = startPage
-
-        while (page < endPage) {
-            val urlWithPage = addPagination(url, page)
-            val rawHtml = try {
-                httpHelper.queryGet(urlWithPage).getOrThrow()
-            } catch (e: Exception) {
-                logAndCollectError(
-                    LOG,
-                    allErrors,
-                    "HTTP error while fetching page=$page url=$urlWithPage, skipping this page",
-                    e,
-                )
-                page++
-                continue
-            }
-
-            if (processRawHtml(allRecommendations, allErrors, url, rawHtml, parser)) {
-                isLastPage = true
-                break
-            }
-
-            page++
-        }
-
-        return Triple(allRecommendations, isLastPage, allErrors)
     }
 
     private fun parseRecommendedAuthors(rawHtml: String): List<AuthorRecommendation> {
