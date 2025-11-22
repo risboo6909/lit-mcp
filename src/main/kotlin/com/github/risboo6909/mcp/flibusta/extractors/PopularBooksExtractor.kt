@@ -4,18 +4,21 @@ import com.github.risboo6909.mcp.McpResponse
 import com.github.risboo6909.utils.HttpClientInterface
 import org.jsoup.Jsoup
 
-const val POPULAR_BOOKS_PER_PAGE = 100
-
 class PopularBooksExtractor(private val httpHelper: HttpClientInterface) {
 
     suspend fun getPopularBooks(
         period: PopularBooksPeriod,
         startPage: Int,
         endPage: Int,
-    ): McpResponse<List<PopularBook>> {
-        val (payload, isLastPage, errors) = getWithPaginationParallel(
-            "$POPULAR_BOOKS_URL/${period.suffix}",
-            POPULAR_BOOKS_PER_PAGE,
+    ): McpResponse<PopularBooksResponse> {
+        val url = "$POPULAR_BOOKS_URL/${period.suffix}"
+        val (totalPages, pagerError) = getTotalPages(
+            url,
+            mapOf(),
+            httpHelper,
+        )
+        val (payload, errors) = getWithPaginationParallel(
+            url,
             httpHelper,
             ::parse,
             mapOf(),
@@ -23,8 +26,11 @@ class PopularBooksExtractor(private val httpHelper: HttpClientInterface) {
             endPage,
         )
         return McpResponse(
-            payload = payload,
-            errors = errors,
+            PopularBooksResponse(
+                payload,
+                totalPages,
+            ),
+            errors = errors + pagerError,
         )
     }
 

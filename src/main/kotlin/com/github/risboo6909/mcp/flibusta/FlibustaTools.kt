@@ -5,9 +5,9 @@ import com.github.risboo6909.mcp.flibusta.extractors.BookDetails
 import com.github.risboo6909.mcp.flibusta.extractors.BookInfoExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.GenreInfo
 import com.github.risboo6909.mcp.flibusta.extractors.GenresListExtractor
-import com.github.risboo6909.mcp.flibusta.extractors.PopularBook
 import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksPeriod
+import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksResponse
 import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsResponse
 import com.github.risboo6909.mcp.flibusta.extractors.SearchBookRef
@@ -111,7 +111,7 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
             required = false,
         )
         period: PopularBooksPeriod?,
-    ): McpResponse<List<PopularBook>> = executeWithTimeout {
+    ): McpResponse<PopularBooksResponse> = executeWithTimeout {
         val startPageValue = startPage ?: 0
         val endPageValue = endPage ?: 1
         val periodValue = period ?: PopularBooksPeriod.ALL_TIME

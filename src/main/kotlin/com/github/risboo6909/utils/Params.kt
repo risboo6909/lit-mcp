@@ -21,8 +21,8 @@ fun joinListParams(xs: List<String>?, separator: String): String {
 
 fun addPagination(url: String, page: Int): String {
     return if (url.contains("?")) {
-        url + "&page=$page"
+        "$url&page=$page"
     } else {
-        url + "?page=$page"
+        "$url?page=$page"
     }
 }

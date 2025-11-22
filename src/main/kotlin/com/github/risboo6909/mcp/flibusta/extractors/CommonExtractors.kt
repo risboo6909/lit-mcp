@@ -1,5 +1,6 @@
 package com.github.risboo6909.mcp.flibusta.extractors
 
+import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 
 fun extractGenreInfo(e: Element): GenreInfo {
@@ -35,4 +36,21 @@ fun extractIdFromHref(href: String, prefix: String): Int? {
     val part = href.substringAfter("$prefix/", "")
     val digits = part.takeWhile { it.isDigit() }
     return digits.toIntOrNull()
+}
+
+fun extractLastPageNumber(doc: Document): Pair<Int?, String?> {
+    val a = doc.selectFirst("li.pager-last a, li.pager-item.last a")
+        ?: return null to "Pager element not found (pager-last / pager-item.last)"
+
+    val fromHref = Regex("""page=(\d+)""")
+        .find(a.attr("href"))
+        ?.groupValues?.getOrNull(1)
+        ?.toIntOrNull()
+
+    if (fromHref != null) return fromHref to null
+
+    val fromText = a.text().toIntOrNull()
+    if (fromText != null) return fromText to null
+
+    return null to "Failed to extract page number from either href or text"
 }

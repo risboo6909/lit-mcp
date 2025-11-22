@@ -10,3 +10,8 @@ data class PopularBook(
     val book: BookInfo?,
     val authors: List<AuthorInfo>?,
 )
+
+data class PopularBooksResponse(
+    val popularBooks: List<PopularBook>? = null,
+    val totalPages: Int? = null,
+)

@@ -8,8 +8,6 @@ import org.jsoup.nodes.Element
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-const val RECOMMENDATIONS_PER_PAGE = 50
-
 class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
 
     companion object {
@@ -21,9 +19,9 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
         startPage: Int,
         endPage: Int,
     ): McpResponse<RecommendationsResponse> {
-        val (payload, isLastPage, errors) = getWithPaginationParallel(
+        val (totalPages, pagerError) = getTotalPages(RECOMMENDATIONS_URL, params, httpHelper)
+        val (payload, errors) = getWithPaginationParallel(
             RECOMMENDATIONS_URL,
-            RECOMMENDATIONS_PER_PAGE,
             httpHelper,
             ::parseRecommendedBooks,
             params,
@@ -33,9 +31,9 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
         return McpResponse(
             RecommendationsResponse(
                 bookRecommendations = payload,
-                isLastPage = isLastPage,
+                totalPages = totalPages,
             ),
-            errors,
+            errors + pagerError,
         )
     }
 
@@ -44,9 +42,9 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
         startPage: Int,
         endPage: Int,
     ): McpResponse<RecommendationsResponse> {
-        val (payload, isLastPage, errors) = getWithPaginationParallel(
+        val (totalPages, pagerError) = getTotalPages(RECOMMENDATIONS_URL, params, httpHelper)
+        val (payload, errors) = getWithPaginationParallel(
             RECOMMENDATIONS_URL,
-            RECOMMENDATIONS_PER_PAGE,
             httpHelper,
             ::parseRecommendedAuthors,
             params,
@@ -56,9 +54,9 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
         return McpResponse(
             RecommendationsResponse(
                 authorRecommendations = payload,
-                isLastPage = isLastPage,
+                totalPages = totalPages,
             ),
-            errors,
+            errors + pagerError,
         )
     }
 
@@ -127,8 +125,8 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
                 extractAuthorInfo(it, false)
             }
 
-            val bookA = bookCell.select("a[href^=/b/]").last() ?: return@mapNotNull null
-            val book = extractBookInfo(bookA)
+            val a = bookCell.select("a[href^=/b/]").last() ?: return@mapNotNull null
+            val book = extractBookInfo(a)
 
             val genres = genreCell.select("a[href^=/g/]").map { a ->
                 extractGenreInfo(a)

@@ -5,30 +5,59 @@ import com.github.risboo6909.utils.HttpClientInterface
 import com.github.risboo6909.utils.addPagination
 import com.github.risboo6909.utils.joinKeyValueParams
 import com.github.risboo6909.utils.logAndCollectError
+import org.jsoup.Jsoup
+
+suspend fun getTotalPages(
+    url: String,
+    params: Map<String, String>,
+    httpHelper: HttpClientInterface,
+): Pair<Int?, List<String>> {
+    val fullUrl = joinKeyValueParams(url, params)
+    val res = httpHelper.queryGet(fullUrl)
+
+    val rawHtml = res.getOrElse { e ->
+        return null to listOf(
+            "Network error while fetching '$fullUrl': " +
+                "${e.message ?: e::class.simpleName}",
+        )
+    }
+
+    if (rawHtml.isBlank()) {
+        return null to listOf("Empty response body from '$fullUrl'")
+    }
+
+    val doc = Jsoup.parse(rawHtml)
+    val (pages, error) = extractLastPageNumber(doc)
+
+    if (pages != null) {
+        return pages to emptyList()
+    }
+
+    return null to listOf(error ?: "Failed to extract total pages from document")
+}
 
 suspend fun <T> getWithPaginationParallel(
     url: String,
-    resultsPerPage: Int,
     httpHelper: HttpClientInterface,
     parser: (String) -> List<T>,
     params: Map<String, String>,
     startPage: Int,
     endPage: Int,
-): Triple<List<T>, Boolean, List<String>> {
+): Pair<List<T>, List<String>> {
     val allResults = mutableListOf<T>()
     val parseErrors = mutableListOf<String>()
-    val url = joinKeyValueParams(url, params)
 
+    val url = joinKeyValueParams(url, params)
     val urls = (startPage until endPage).map {
         addPagination(url, it)
     }
 
     val (payloads, networkErrors) = httpHelper.fetchMultiplePages(urls)
-    val containsLastPage = payloads.map {
-        processRawHtml(resultsPerPage, allResults, parseErrors, url, it, parser)
-    }.any { it }
+    payloads.forEach {
+        processRawHtml(allResults, parseErrors, url, it, parser)
+    }
 
-    return Triple(allResults, containsLastPage, parseErrors + networkErrors)
+    return allResults to parseErrors + networkErrors
 }
 
 /**
@@ -39,19 +68,16 @@ suspend fun <T> getWithPaginationParallel(
  */
 private suspend fun <T> getWithPaginationSerial(
     url: String,
-    resultsPerPage: Int,
     httpHelper: HttpClientInterface,
     parser: (String) -> List<T>,
     params: Map<String, String>,
     startPage: Int,
     endPage: Int,
-): Triple<List<T>, Boolean, List<String>> {
+): Pair<List<T>, List<String>> {
     val allResults = mutableListOf<T>()
     val allErrors = mutableListOf<String>()
 
     val url = joinKeyValueParams(url, params)
-
-    var isLastPage = false
 
     for (page in startPage until endPage) {
         val urlWithPage = addPagination(url, page)
@@ -66,25 +92,19 @@ private suspend fun <T> getWithPaginationSerial(
             )
             continue
         }
-
-        if (processRawHtml(resultsPerPage, allResults, allErrors, url, rawHtml, parser)) {
-            isLastPage = true
-            break
-        }
+        processRawHtml(allResults, allErrors, url, rawHtml, parser)
     }
-
-    return Triple(allResults, isLastPage, allErrors)
+    return allResults to allErrors
 }
 
 // Helper to process raw HTML and update recommendations list
 private fun <T> processRawHtml(
-    resultsPerPage: Int,
     allResults: MutableList<T>,
     allErrors: MutableList<String>,
     url: String,
     rawHtml: String,
     parser: (String) -> List<T>,
-): Boolean {
+) {
     val parsed = try {
         parser(rawHtml)
     } catch (pe: Throwable) {
@@ -95,19 +115,7 @@ private fun <T> processRawHtml(
                 "skipping this page",
             pe,
         )
-        return false
+        return
     }
-
     allResults.addAll(parsed)
-
-    if (parsed.size < resultsPerPage) {
-        LOG.info(
-            "Parser returned less than page size ($resultsPerPage)" +
-                " results for url=$url, stopping pagination",
-        )
-
-        return true
-    }
-
-    return false
 }

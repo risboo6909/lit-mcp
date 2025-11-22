@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonInclude
 data class RecommendationsResponse(
     val authorRecommendations: List<AuthorRecommendation>? = null,
     val bookRecommendations: List<BookRecommendation>? = null,
-    val isLastPage: Boolean = false,
+    val totalPages: Int? = null,
 )
 
 data class AuthorRecommendation(
