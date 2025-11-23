@@ -5,7 +5,7 @@ import com.github.risboo6909.utils.HttpClientInterface
 import org.jsoup.Jsoup
 
 class SearchBooksByName(private val httpHelper: HttpClientInterface) {
-    suspend fun searchBooksByName(bookName: String): McpResponse<List<SearchBookRef>> {
+    suspend fun searchBooksByName(bookName: String): McpResponse<List<SearchBookInfo>> {
         val result = httpHelper.queryGet("$BOOK_INFO_URL/$bookName")
         return McpResponse(
             parse(result.getOrDefault("")),
@@ -15,7 +15,7 @@ class SearchBooksByName(private val httpHelper: HttpClientInterface) {
         )
     }
 
-    private fun parse(rawHtml: String, baseUrl: String = FLIBUSTA_BASE_URL): List<SearchBookRef> {
+    private fun parse(rawHtml: String, baseUrl: String = FLIBUSTA_BASE_URL): List<SearchBookInfo> {
         val doc = Jsoup.parse(rawHtml, baseUrl)
 
         return doc.select("ol > li").mapNotNull { li ->
@@ -38,7 +38,7 @@ class SearchBooksByName(private val httpHelper: HttpClientInterface) {
                 )
             }
 
-            SearchBookRef(
+            SearchBookInfo(
                 id = bookId,
                 title = title,
                 authors = authors.takeIf { it.isNotEmpty() },

@@ -10,7 +10,7 @@ import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksPeriod
 import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksResponse
 import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsResponse
-import com.github.risboo6909.mcp.flibusta.extractors.SearchBookRef
+import com.github.risboo6909.mcp.flibusta.extractors.SearchBookInfo
 import com.github.risboo6909.mcp.flibusta.extractors.SearchBooksByName
 import com.github.risboo6909.utils.HttpClientInterface
 import com.github.risboo6909.utils.joinListParams
@@ -62,7 +62,7 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
             description = "Book name to search for on Flibusta (required)",
         )
         bookName: String,
-    ): McpResponse<List<SearchBookRef>> = executeWithTimeout {
+    ): McpResponse<List<SearchBookInfo>> = executeWithTimeout {
         searchBookByName.searchBooksByName(
             URLEncoder.encode(bookName, StandardCharsets.UTF_8.toString()),
         )

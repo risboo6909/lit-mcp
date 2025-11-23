@@ -23,8 +23,7 @@ dependencies {
     implementation("org.springframework:spring-web")
     implementation("org.springframework.ai:spring-ai-starter-mcp-server")
     implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.ai:spring-ai-starter-mcp-server-webmvc:1.1.0")
-    implementation("org.springframework.ai:spring-ai-starter-mcp-server-webmvc:1.1.0-M1")
+    implementation("org.springframework.ai:spring-ai-starter-mcp-server-webmvc")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
     implementation("org.jsoup:jsoup:1.18.1")
 
