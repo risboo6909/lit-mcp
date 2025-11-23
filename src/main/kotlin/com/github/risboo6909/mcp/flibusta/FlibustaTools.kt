@@ -24,7 +24,7 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 const val FETCH_TIMEOUT_MILLIS: Long = 60 * 1000 // Flibusta can be slow sometimes
-const val MAX_PAGES_PER_REQUEST = 5
+const val MAX_PAGES_PER_REQUEST = 10 // To reduce the time spent waiting for multiple pages
 
 @Service
 class FlibustaTools(private val httpHelper: HttpClientInterface) {
@@ -37,9 +37,11 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
 
     @McpTool(
         name = "flibustaGetGenresList",
+        title = "Flibusta Get Genres List",
         description = "[Flibusta] Get all available genres list",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
+            openWorldHint = true,
             destructiveHint = false,
             idempotentHint = true,
         ),
@@ -50,9 +52,11 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
 
     @McpTool(
         name = "flibustaSearchBooksByName",
+        title = "Flibusta Search Books By Name",
         description = "[Flibusta] Search books by name and returns their names and IDs",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
+            openWorldHint = true,
             destructiveHint = false,
             idempotentHint = true,
         ),
@@ -70,9 +74,12 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
 
     @McpTool(
         name = "flibustaGetBookInfoByIds",
-        description = "[Flibusta] Get book info by book ID",
+        title = "Flibusta Get Book Info By IDs",
+        description = "[Flibusta] Get book info by book ID. Returns detailed info for each book ID such as " +
+            "title, authors, genres, description, download links, user rating, user reviews, etc.",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
+            openWorldHint = true,
             destructiveHint = false,
             idempotentHint = true,
         ),
@@ -88,9 +95,11 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
 
     @McpTool(
         name = "flibustaGetPopularBooksList",
+        title = "Flibusta Get Popular Books List",
         description = "[Flibusta] Get top rated books list",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
+            openWorldHint = true,
             destructiveHint = false,
             idempotentHint = true,
         ),
@@ -120,10 +129,12 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
 
     @McpTool(
         name = "flibustaGetRecommendedBooks",
+        title = "Flibusta Get Recommended Books",
         description = "[Flibusta] Get recommended books paginated (50 items per page, " +
             "max $MAX_PAGES_PER_REQUEST pages per request)",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
+            openWorldHint = true,
             destructiveHint = false,
             idempotentHint = true,
         ),
@@ -178,10 +189,12 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
 
     @McpTool(
         name = "flibustaRecommendedAuthors",
+        title = "Flibusta Get Recommended Authors",
         description = "[Flibusta] Get recommended authors paginated (50 items per page, " +
             "max $MAX_PAGES_PER_REQUEST pages per request)",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
+            openWorldHint = true,
             destructiveHint = false,
             idempotentHint = true,
         ),
