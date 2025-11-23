@@ -36,6 +36,12 @@ suspend fun getTotalPages(
     return null to listOf(error ?: "Failed to extract total pages from document")
 }
 
+/**
+ * This function fetches recommendation pages in parallel from startPage to endPage (exclusive).
+ * It is fetching all pages at once, so it is faster for large page ranges.
+ *
+ * This is preferable to the serial version for large page ranges.
+ */
 suspend fun <T> getWithPaginationParallel(
     url: String,
     httpHelper: HttpClientInterface,
