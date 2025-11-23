@@ -88,7 +88,15 @@ One of possible ways to try it out is to use Claude Desktop app. You can configu
 }
 ```
 6. Save the file and restart Claude Desktop.
-7. Enjoy!
+7. Enjoy! Try to ask Claude to search for a book or get book info, e.g. "Find me books by Isaac Asimov and provide links to download them from Flibusta".
+
+Example output from Claude when using `lit-mcp`:
+![example.png](example.png)
+
+## Contributing
+
+Contributions are welcome! If you find any issues or have suggestions for improvements, please feel free to open an issue 
+or submit a pull request.
 
 ## Future plans
 
