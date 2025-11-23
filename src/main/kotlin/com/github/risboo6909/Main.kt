@@ -6,11 +6,8 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.int
-import org.springframework.beans.factory.annotation.Value
-import org.springframework.boot.CommandLineRunner
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
-import org.springframework.stereotype.Component
 
 @SpringBootApplication
 class Application {
@@ -45,21 +42,6 @@ class Application {
                 }
             }
             command.main(args)
-        }
-    }
-}
-
-@Component
-class McpStdioRunner : CommandLineRunner {
-
-    @Value("\${spring.ai.mcp.server.stdio:false}")
-    private val stdio: Boolean = false
-
-    override fun run(args: Array<String>) {
-        if (stdio) {
-            while (true) {
-                Thread.sleep(1000)
-            }
         }
     }
 }
