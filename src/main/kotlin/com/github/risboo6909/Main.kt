@@ -38,6 +38,7 @@ class Application {
                         // HTTP/SSE MCP server: normal web application on the given port
                         args += "--spring.ai.mcp.server.stdio=false"
                         args += "--server.port=$port"
+                        args += "--spring.ai.mcp.server.protocol=STREAMABLE"
                     }
 
                     runApplication<Application>(*args.toTypedArray())
@@ -56,7 +57,6 @@ class McpStdioRunner : CommandLineRunner {
 
     override fun run(args: Array<String>) {
         if (stdio) {
-            // Keep the application running indefinitely for STDIO mode
             while (true) {
                 Thread.sleep(1000)
             }
