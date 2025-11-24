@@ -21,8 +21,8 @@ class FlibustaToolsTest {
             <ul class='pager'><li class='pager-last'><a href='/rec?view=authors&page=5'>5</a></li></ul>
             </body></html>
         """.trimIndent()
-        whenever(httpHelper.queryGet(any<String>(), any())).thenReturn(Result.success(rawHtml))
-        whenever(httpHelper.fetchMultiplePages(any())).thenAnswer { _ ->
+        whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenReturn(Result.success(rawHtml))
+        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { _ ->
             listOf(rawHtml, rawHtml, rawHtml) to emptyList<String>()
         }
         val response = flibustaTools.getRecommendedAuthors(0, 3)
@@ -75,8 +75,8 @@ class FlibustaToolsTest {
             <ul class='pager'><li class='pager-last'><a href='/rec?view=books&page=5'>5</a></li></ul>
             </body></html>
         """.trimIndent()
-        whenever(httpHelper.queryGet(any<String>(), any())).thenReturn(Result.success(rawHtml))
-        whenever(httpHelper.fetchMultiplePages(any())).thenAnswer { _ ->
+        whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenReturn(Result.success(rawHtml))
+        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { _ ->
             listOf(rawHtml, rawHtml, rawHtml) to emptyList<String>()
         }
         val response = flibustaTools.getRecommendedBooks(0, 3)
