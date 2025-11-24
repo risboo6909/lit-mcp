@@ -6,9 +6,11 @@ import com.github.risboo6909.mcp.fbsearch.extractors.SearchResult
 import com.github.risboo6909.utils.HttpClientInterface
 import com.github.risboo6909.utils.executeWithTimeout
 import org.springaicommunity.mcp.annotation.McpTool
+import org.springframework.stereotype.Service
 
 const val FETCH_TIMEOUT_MILLIS: Long = 60 * 1000
 
+@Service
 class FbSearchTools(private val httpHelper: HttpClientInterface) {
     private val fullTextSearch = FullTextBooksSearch(httpHelper)
 
