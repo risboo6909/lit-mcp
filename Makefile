@@ -10,7 +10,7 @@ run_http: build
 run_stdio: build
 	java -jar $(JAR_FILE) --transport=stdio
 
-npx_run:
+run_npx:
 	npx @modelcontextprotocol/inspector
 
 test:
