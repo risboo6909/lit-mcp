@@ -16,7 +16,7 @@ class FullTextBooksSearch(private val httpHelper: HttpClientInterface) {
             SearchResult(
                 page = 1,
             ),
-            emptyList(),
+            listOf("Not yet implemented"),
         )
     }
 }
