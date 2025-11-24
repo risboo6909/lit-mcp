@@ -29,7 +29,7 @@ class HttpClient : HttpClientInterface {
 
     private val ktorClient = HttpClient(CIO) {
         install(HttpTimeout) {
-            requestTimeoutMillis = 10_000
+            requestTimeoutMillis = 20_000
         }
     }
 
