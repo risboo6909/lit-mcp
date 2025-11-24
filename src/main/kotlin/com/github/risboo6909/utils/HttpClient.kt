@@ -29,7 +29,7 @@ class HttpClient : HttpClientInterface {
 
     private val ktorClient = HttpClient(CIO) {
         install(HttpTimeout) {
-            requestTimeoutMillis = 20_000
+            requestTimeoutMillis = 5000
         }
     }
 
@@ -60,7 +60,7 @@ class HttpClient : HttpClientInterface {
         return Result.failure(lastError ?: RuntimeException("Failed to fetch $url"))
     }
 
-    override suspend fun fetchMultiplePages(urls: List<String>): Pair<List<String>, List<String>> {
+    override suspend fun fetchMultiplePages(urls: List<String>, retries: Int): Pair<List<String>, List<String>> {
         val semaphore = Semaphore(MAX_CONCURRENT_REQUESTS)
         val pairs = coroutineScope {
             urls.map { url ->
