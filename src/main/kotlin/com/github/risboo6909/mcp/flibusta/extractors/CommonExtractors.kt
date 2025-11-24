@@ -40,7 +40,7 @@ fun extractIdFromHref(href: String, prefix: String): Int? {
 
 fun extractLastPageNumber(doc: Document): Pair<Int?, String?> {
     val a = doc.selectFirst("li.pager-last a, li.pager-item.last a")
-        ?: return 1 to null  // if there's no last page link, assume there's only one page
+        ?: return 1 to null // if there's no last page link, assume there's only one page
 
     val fromHref = Regex("""page=(\d+)""")
         .find(a.attr("href"))

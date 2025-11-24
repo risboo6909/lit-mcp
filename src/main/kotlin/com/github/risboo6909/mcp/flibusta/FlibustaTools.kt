@@ -94,7 +94,7 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
     @McpTool(
         name = "flibustaGetPopularBooksList",
         title = "Flibusta Get Popular Books List",
-        description = "[Flibusta] Get top rated books list",
+        description = "[Flibusta] Get top rated books list (100 items per)",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
             openWorldHint = true,
@@ -114,7 +114,7 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
         )
         endPage: Int? = null,
         @McpToolParam(
-            description = "Period (day/week/all) to get popular books for. Default: all.",
+            description = "Period (TODAY/WEEK/ALL_TIME) to get popular books for. Default: ALL_TIME.",
             required = false,
         )
         period: PopularBooksPeriod?,
