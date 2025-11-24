@@ -17,7 +17,7 @@ class FbSearchTools(private val httpHelper: HttpClientInterface) {
     @McpTool(
         name = "fbSearch",
         title = "Full Text Books Search",
-        description = "[fbSearch] Full text search for books on fbsearch.ru",
+        description = "[TODO] [fbSearch] Full text search for books on fbsearch.ru",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
             openWorldHint = true,
