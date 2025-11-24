@@ -1,5 +1,5 @@
 GRADLEW = ./gradlew
-JAR_FILE = build/libs/lit-mcp-1.0-SNAPSHOT.jar
+JAR_FILE = build/libs/lit-mcp-1.0.jar
 
 build:
 	$(GRADLEW) spotlessApply bootJar
