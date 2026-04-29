@@ -18,7 +18,7 @@ val ktorVersion = "3.0.0"
 
 dependencies {
     implementation("com.github.ajalt.clikt:clikt:5.0.3")
-    implementation(platform("org.springframework.ai:spring-ai-bom:1.1.0-M1"))
+    implementation(platform("org.springframework.ai:spring-ai-bom:2.0.0-M1"))
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework:spring-web")
     implementation("org.springframework.ai:spring-ai-starter-mcp-server")
