@@ -31,5 +31,10 @@ jobs:
       - name: Check formatting
         run: ./gradlew spotlessCheck
 
+      - name: Validate installer
+        run: |
+          test -x install.sh
+          sh -n install.sh
+
       - name: Run tests
         run: ./gradlew test

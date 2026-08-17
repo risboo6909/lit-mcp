@@ -25,6 +25,11 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Validate installer
+        run: |
+          test -x install.sh
+          sh -n install.sh
+
       - name: Build and test
         env:
           RELEASE_VERSION: ${{ github.ref_name }}
@@ -39,6 +44,7 @@ jobs:
           RELEASE_VERSION="${RELEASE_VERSION#v}"
           mkdir release
           cp "build/libs/lit-mcp-$RELEASE_VERSION.jar" release/lit-mcp.jar
+          cp install.sh release/install.sh
           cd release
           sha256sum lit-mcp.jar > lit-mcp.jar.sha256
 
@@ -47,6 +53,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
+            release/install.sh \
             release/lit-mcp.jar \
             release/lit-mcp.jar.sha256 \
             --verify-tag \

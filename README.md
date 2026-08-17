@@ -42,6 +42,21 @@ For more information, please check the source code and the tool definitions.
 Please make sure you have Java 21 or newer installed on your system. Kotlin and Gradle are not required to run the
 prebuilt application.
 
+### Automatic installation
+
+On macOS or Linux, download and configure `lit-mcp` for Codex with:
+
+```bash
+curl -fsSL https://github.com/risboo6909/lit-mcp/releases/latest/download/install.sh | sh -s -- codex
+```
+
+For Claude Code, replace `codex` with `claude`. To configure both clients, use `all`.
+
+The installer verifies the downloaded JAR, stores it in your user data directory, and registers the MCP server using
+the selected client's CLI. It does not configure Claude Desktop; see the manual instructions below for that client.
+
+### Manual installation
+
 Download `lit-mcp.jar` from the [latest GitHub release](https://github.com/risboo6909/lit-mcp/releases/latest), or use:
 
 ```bash
