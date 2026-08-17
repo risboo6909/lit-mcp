@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.github.risboo6909"
-version = "1.0"
+version = providers.gradleProperty("releaseVersion").getOrElse("1.0")
 
 repositories {
     mavenCentral()

@@ -39,7 +39,22 @@ For more information, please check the source code and the tool definitions.
 
 ## Usage
 
-Please make sure you have `Java` installed on your system.
+Please make sure you have Java 21 or newer installed on your system. Kotlin and Gradle are not required to run the
+prebuilt application.
+
+Download `lit-mcp.jar` from the [latest GitHub release](https://github.com/risboo6909/lit-mcp/releases/latest), or use:
+
+```bash
+curl -L https://github.com/risboo6909/lit-mcp/releases/latest/download/lit-mcp.jar -o lit-mcp.jar
+```
+
+Run the downloaded JAR in `stdio` mode with:
+
+```bash
+java -jar lit-mcp.jar --transport=stdio
+```
+
+### Building from source
 
 To build the project, you can use the following command:
 
@@ -70,10 +85,10 @@ To connect `lit-mcp` to Codex, add the following to `~/.codex/config.toml`:
 ```toml
 [mcp_servers.lit]
 command = "java"
-args = ["-jar", "/absolute/path/to/lit-mcp/build/libs/lit-mcp-1.0.jar", "--transport=stdio"]
+args = ["-jar", "/absolute/path/to/lit-mcp.jar", "--transport=stdio"]
 ```
 
-Replace `/absolute/path/to/lit-mcp` with the path to your local checkout, then restart Codex.
+Replace `/absolute/path/to/lit-mcp.jar` with the location of the downloaded JAR, then restart Codex.
 
 ### Claude Desktop
 
@@ -91,7 +106,7 @@ One of possible ways to try it out is to use Claude Desktop app. You can configu
       "command": "java",
       "args": [
         "-jar",
-        "/path_to_mcp_server/lit-mcp-1.0.jar",
+        "/absolute/path/to/lit-mcp.jar",
         "--transport=stdio"
       ]
     }
