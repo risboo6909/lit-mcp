@@ -22,10 +22,7 @@ this is not yet feasible for non-trivial projects and lots of human input is sti
 ## Features and limitations
 
 `lit-mcp` supports both `stdio` and `HTTP` modes. `stdio` mode is useful to run the MCP server locally and connect 
-it to LLMs that support `stdio` MCPs (like Claude Desktop or local LLMs that run under LMStudio). 
-
-Unfortunately not many well known LLMs support custom MCPs yet. So this project is mostly for the
-future when more LLMs will support custom MCPs.
+it to clients that support `stdio` MCPs (such as Codex, Claude Desktop, or local LLMs running under LM Studio).
 
 Only books in Russian language are supported at the moment, since **Flibusta** mostly contains russian books.
 
@@ -65,6 +62,20 @@ make run_http
 ```
 
 On Windows systems, please use `gradlew.bat` to build and run the project.
+
+### Codex
+
+To connect `lit-mcp` to Codex, add the following to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.lit]
+command = "java"
+args = ["-jar", "/absolute/path/to/lit-mcp/build/libs/lit-mcp-1.0.jar", "--transport=stdio"]
+```
+
+Replace `/absolute/path/to/lit-mcp` with the path to your local checkout, then restart Codex.
+
+### Claude Desktop
 
 One of possible ways to try it out is to use Claude Desktop app. You can configure it to use `lit-mcp` in `stdio` mode by following these steps:
 
