@@ -25,7 +25,7 @@ const val DEFAULT_HTTP_REQUEST_TIMEOUT_MILLIS = 15_000L
 @Component
 class HttpClient(
     @Value("\${lit-mcp.http-request-timeout-millis:15000}")
-    requestTimeoutMillis: Long = DEFAULT_HTTP_REQUEST_TIMEOUT_MILLIS,
+    requestTimeoutMillis: Long,
 ) : HttpClientInterface {
 
     companion object {

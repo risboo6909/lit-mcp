@@ -29,7 +29,7 @@ const val MAX_PAGES_PER_REQUEST = 10 // To reduce the time spent waiting for mul
 class FlibustaTools(
     httpHelper: HttpClientInterface,
     @Value("\${lit-mcp.tool-timeout-millis:120000}")
-    private val toolTimeoutMillis: Long = DEFAULT_TOOL_TIMEOUT_MILLIS,
+    private val toolTimeoutMillis: Long,
 ) {
 
     private val genresExtractor = GenresListExtractor(httpHelper)

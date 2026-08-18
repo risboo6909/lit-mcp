@@ -15,7 +15,7 @@ const val DEFAULT_TOOL_TIMEOUT_MILLIS: Long = 120 * 1000
 class FbSearchTools(
     private val httpHelper: HttpClientInterface,
     @Value("\${lit-mcp.tool-timeout-millis:120000}")
-    private val toolTimeoutMillis: Long = DEFAULT_TOOL_TIMEOUT_MILLIS,
+    private val toolTimeoutMillis: Long,
 ) {
     private val fullTextSearch = FullTextBooksSearch(httpHelper)
 

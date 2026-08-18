@@ -16,7 +16,7 @@ import org.mockito.kotlin.whenever
 class FlibustaToolsTest {
 
     private val httpHelper = mock<HttpClientInterface>()
-    private val flibustaTools = FlibustaTools(httpHelper)
+    private val flibustaTools = FlibustaTools(httpHelper, DEFAULT_TOOL_TIMEOUT_MILLIS)
 
     @Test
     fun genresList_cachesSuccessfulResponse() = runBlocking {
