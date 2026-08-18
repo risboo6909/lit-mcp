@@ -99,8 +99,8 @@ class FlibustaTools(
     @McpTool(
         name = "flibustaGetPopularBooksList",
         title = "Flibusta Get Popular Books List",
-        description = "[Flibusta] Get popular books list (100 items per source page), optionally filtered or " +
-            "grouped by genre",
+        description = "[Flibusta] Get popular books list (100 items per source page, " +
+            "max $MAX_PAGES_PER_REQUEST pages per request), optionally filtered or grouped by genre",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
             openWorldHint = true,
