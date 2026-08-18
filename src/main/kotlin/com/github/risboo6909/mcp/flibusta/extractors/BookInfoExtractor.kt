@@ -7,13 +7,43 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.TextNode
 
-class BookInfoExtractor(private val httpHelper: HttpClientInterface) {
+class BookInfoExtractor(
+    private val httpHelper: HttpClientInterface,
+    private val genresListExtractor: GenresListExtractor,
+) {
 
     suspend fun getBookInfoByIds(bookIds: List<Int>): McpResponse<List<BookDetails>> {
         val result = httpHelper.fetchMultiplePages(bookIds.map { "$BOOK_INFO_URL/$it" })
+        val books = result.first.filter { it.isNotEmpty() }.map { parse(it) }
+        val catalogResponse = genresListExtractor.getGenreCatalog()
+        val catalog = catalogResponse.payload.orEmpty()
         return McpResponse(
-            result.first.filter { !it.isEmpty() }.map { parse(it) },
-            result.second,
+            payload = books.map { book ->
+                book.copy(
+                    genres = book.genres?.map { enrichGenreInfo(it, catalog) },
+                )
+            },
+            errors = result.second + catalogResponse.errors,
+        )
+    }
+
+    suspend fun getGenresByBookIds(bookIds: List<Int>): McpResponse<Map<Int, List<GenreInfo>>> {
+        val result = httpHelper.fetchMultiplePages(bookIds.map { "$BOOK_INFO_URL/$it" })
+        val genresByBookId = bookIds.zip(result.first).mapNotNull { (bookId, rawHtml) ->
+            if (rawHtml.isBlank()) {
+                null
+            } else {
+                bookId to extractGenres(Jsoup.parse(rawHtml, FLIBUSTA_BASE_URL))
+            }
+        }.toMap()
+        val catalogResponse = genresListExtractor.getGenreCatalog()
+        val catalog = catalogResponse.payload.orEmpty()
+
+        return McpResponse(
+            payload = genresByBookId.mapValues { (_, genres) ->
+                genres.map { enrichGenreInfo(it, catalog) }
+            },
+            errors = result.second + catalogResponse.errors,
         )
     }
 

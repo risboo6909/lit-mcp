@@ -3,6 +3,16 @@ package com.github.risboo6909.mcp.flibusta.extractors
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 
+fun normalizeGenreName(name: String): String = name.trim().lowercase()
+
+fun enrichGenreInfo(genre: GenreInfo, catalog: Map<String, GenreInfo>): GenreInfo {
+    val catalogGenre = catalog[normalizeGenreName(genre.name)] ?: return genre
+    return genre.copy(
+        id = genre.id ?: catalogGenre.id,
+        slug = genre.slug ?: catalogGenre.slug,
+    )
+}
+
 fun extractGenreInfo(e: Element): GenreInfo {
     return GenreInfo(
         id = extractIdFromHref(e.attr("href"), "/g"),

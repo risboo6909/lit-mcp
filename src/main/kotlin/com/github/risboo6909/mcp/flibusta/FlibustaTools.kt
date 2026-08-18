@@ -17,21 +17,26 @@ import com.github.risboo6909.utils.executeWithTimeout
 import com.github.risboo6909.utils.joinListParams
 import org.springaicommunity.mcp.annotation.McpTool
 import org.springaicommunity.mcp.annotation.McpToolParam
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
-const val FETCH_TIMEOUT_MILLIS: Long = 60 * 1000 // Flibusta can be slow sometimes
+const val DEFAULT_TOOL_TIMEOUT_MILLIS: Long = 120 * 1000 // Flibusta can be slow sometimes
 const val MAX_PAGES_PER_REQUEST = 10 // To reduce the time spent waiting for multiple pages
 
 @Service
-class FlibustaTools(private val httpHelper: HttpClientInterface) {
+class FlibustaTools(
+    httpHelper: HttpClientInterface,
+    @Value("\${lit-mcp.tool-timeout-millis:120000}")
+    private val toolTimeoutMillis: Long = DEFAULT_TOOL_TIMEOUT_MILLIS,
+) {
 
-    private val recExtractor = RecommendationsExtractor(httpHelper)
-    private val bookInfoExtractor = BookInfoExtractor(httpHelper)
     private val genresExtractor = GenresListExtractor(httpHelper)
+    private val recExtractor = RecommendationsExtractor(httpHelper, genresExtractor)
+    private val bookInfoExtractor = BookInfoExtractor(httpHelper, genresExtractor)
     private val searchBookByName = SearchBooksByName(httpHelper)
-    private val popularBooksExtractor = PopularBooksExtractor(httpHelper)
+    private val popularBooksExtractor = PopularBooksExtractor(httpHelper, bookInfoExtractor)
 
     @McpTool(
         name = "flibustaGetGenresList",
@@ -44,7 +49,7 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
             idempotentHint = true,
         ),
     )
-    fun getGenresList(): McpResponse<List<GenreInfo>> = executeWithTimeout(FETCH_TIMEOUT_MILLIS) {
+    fun getGenresList(): McpResponse<List<GenreInfo>> = executeWithTimeout(toolTimeoutMillis) {
         genresExtractor.getAllGenres()
     }
 
@@ -64,7 +69,7 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
             description = "Book name to search for on Flibusta (required)",
         )
         bookName: String,
-    ): McpResponse<List<SearchBookInfo>> = executeWithTimeout(FETCH_TIMEOUT_MILLIS) {
+    ): McpResponse<List<SearchBookInfo>> = executeWithTimeout(toolTimeoutMillis) {
         searchBookByName.searchBooksByName(
             URLEncoder.encode(bookName, StandardCharsets.UTF_8.toString()),
         )
@@ -87,14 +92,15 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
             description = "List of Flibusta book IDs to fetch (required)",
         )
         bookIds: List<Int>,
-    ): McpResponse<List<BookDetails>> = executeWithTimeout(FETCH_TIMEOUT_MILLIS) {
+    ): McpResponse<List<BookDetails>> = executeWithTimeout(toolTimeoutMillis) {
         bookInfoExtractor.getBookInfoByIds(bookIds)
     }
 
     @McpTool(
         name = "flibustaGetPopularBooksList",
         title = "Flibusta Get Popular Books List",
-        description = "[Flibusta] Get top rated books list (100 items per)",
+        description = "[Flibusta] Get popular books list (100 items per source page), optionally filtered or " +
+            "grouped by genre",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
             openWorldHint = true,
@@ -117,12 +123,58 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
             description = "Period (TODAY/WEEK/ALL_TIME) to get popular books for. Default: ALL_TIME.",
             required = false,
         )
-        period: PopularBooksPeriod?,
-    ): McpResponse<PopularBooksResponse> = executeWithTimeout(FETCH_TIMEOUT_MILLIS) {
+        period: PopularBooksPeriod? = null,
+        @McpToolParam(
+            description = "Genre slugs to filter by (optional). A book matches when it has any requested genre.",
+            required = false,
+        )
+        genreSlugs: List<String>? = null,
+        @McpToolParam(
+            description = "Include genre counts for the returned books. Default: false.",
+            required = false,
+        )
+        includeGenreBreakdown: Boolean? = null,
+    ): McpResponse<PopularBooksResponse> = executeWithTimeout(toolTimeoutMillis) {
         val startPageValue = startPage ?: 0
         val endPageValue = endPage ?: 1
         val periodValue = period ?: PopularBooksPeriod.ALL_TIME
-        popularBooksExtractor.getPopularBooks(periodValue, startPageValue, endPageValue)
+
+        validatePageRange<PopularBooksResponse>(startPageValue, endPageValue)
+            ?.let { return@executeWithTimeout it }
+
+        val requestedGenreSlugs = genreSlugs.orEmpty()
+            .map { it.trim().lowercase() }
+            .filter { it.isNotEmpty() }
+            .toSet()
+
+        val genreNames = if (requestedGenreSlugs.isEmpty()) {
+            emptySet()
+        } else {
+            val genresResponse = genresExtractor.getAllGenres()
+            if (genresResponse.errors.isNotEmpty()) {
+                return@executeWithTimeout McpResponse(errors = genresResponse.errors)
+            }
+
+            val genresBySlug = genresResponse.payload.orEmpty()
+                .mapNotNull { genre -> genre.slug?.lowercase()?.let { it to genre.name } }
+                .toMap()
+            val unknownGenreSlugs = requestedGenreSlugs - genresBySlug.keys
+            if (unknownGenreSlugs.isNotEmpty()) {
+                return@executeWithTimeout McpResponse(
+                    errors = listOf("Unknown genre slugs: ${unknownGenreSlugs.sorted().joinToString(", ")}"),
+                )
+            }
+
+            requestedGenreSlugs.mapTo(mutableSetOf()) { genresBySlug.getValue(it) }
+        }
+
+        popularBooksExtractor.getPopularBooks(
+            periodValue,
+            startPageValue,
+            endPageValue,
+            genreNames,
+            includeGenreBreakdown ?: false,
+        )
     }
 
     @McpTool(
@@ -168,10 +220,10 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
 
         val genreSlugsValue = joinListParams(genreSlugs, ",")
 
-        validateRecommendationsRequest<RecommendationsResponse>(startPageValue, endPageValue)
+        validatePageRange<RecommendationsResponse>(startPageValue, endPageValue)
             ?.let { return it }
 
-        return executeWithTimeout(FETCH_TIMEOUT_MILLIS) {
+        return executeWithTimeout(toolTimeoutMillis) {
             recExtractor.getRecommendedBooks(
                 mapOf(
                     "view" to "books",
@@ -219,10 +271,10 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
 
         val genreSlugsValue = joinListParams(genreSlugs, ",")
 
-        validateRecommendationsRequest<RecommendationsResponse>(startPageValue, endPageValue)
+        validatePageRange<RecommendationsResponse>(startPageValue, endPageValue)
             ?.let { return it }
 
-        return executeWithTimeout(FETCH_TIMEOUT_MILLIS) {
+        return executeWithTimeout(toolTimeoutMillis) {
             recExtractor.getRecommendedAuthors(
                 mapOf(
                     "view" to "authors",
@@ -234,7 +286,7 @@ class FlibustaTools(private val httpHelper: HttpClientInterface) {
         }
     }
 
-    private fun <T> validateRecommendationsRequest(startPage: Int, endPage: Int): McpResponse<T>? {
+    private fun <T> validatePageRange(startPage: Int, endPage: Int): McpResponse<T>? {
         if (startPage < 0) {
             return McpResponse(
                 errors = listOf("Error: Start page must be 0 or greater"),

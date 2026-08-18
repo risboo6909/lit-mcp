@@ -9,9 +9,16 @@ enum class PopularBooksPeriod(val suffix: String) {
 data class PopularBook(
     val book: BookInfo?,
     val authors: List<AuthorInfo>?,
+    val genres: List<GenreInfo>? = null,
+)
+
+data class PopularBooksGenreCount(
+    val genre: GenreInfo,
+    val booksCount: Int,
 )
 
 data class PopularBooksResponse(
     val popularBooks: List<PopularBook>? = null,
     val totalPages: Int? = null,
+    val genreBreakdown: List<PopularBooksGenreCount>? = null,
 )

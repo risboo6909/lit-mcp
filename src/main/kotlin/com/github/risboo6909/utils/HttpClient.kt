@@ -13,15 +13,20 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Semaphore
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import kotlin.math.min
 import kotlin.math.pow
 
 const val MAX_CONCURRENT_REQUESTS = 10
 const val MAX_RETRIES = 10
+const val DEFAULT_HTTP_REQUEST_TIMEOUT_MILLIS = 15_000L
 
 @Component
-class HttpClient : HttpClientInterface {
+class HttpClient(
+    @Value("\${lit-mcp.http-request-timeout-millis:15000}")
+    requestTimeoutMillis: Long = DEFAULT_HTTP_REQUEST_TIMEOUT_MILLIS,
+) : HttpClientInterface {
 
     companion object {
         val LOG: Logger = LoggerFactory.getLogger(RecommendationsExtractor::class.java.name)
@@ -29,7 +34,7 @@ class HttpClient : HttpClientInterface {
 
     private val ktorClient = HttpClient(CIO) {
         install(HttpTimeout) {
-            requestTimeoutMillis = 5000
+            this.requestTimeoutMillis = requestTimeoutMillis
         }
     }
 

@@ -8,7 +8,10 @@ import org.jsoup.nodes.Element
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
+class RecommendationsExtractor(
+    private val httpHelper: HttpClientInterface,
+    private val genresListExtractor: GenresListExtractor,
+) {
 
     companion object {
         val LOG: Logger = LoggerFactory.getLogger(RecommendationsExtractor::class.java.name)
@@ -28,12 +31,19 @@ class RecommendationsExtractor(private val httpHelper: HttpClientInterface) {
             startPage,
             endPage,
         )
+        val catalogResponse = genresListExtractor.getGenreCatalog()
+        val catalog = catalogResponse.payload.orEmpty()
+        val enrichedBooks = payload.map { recommendation ->
+            recommendation.copy(
+                genres = recommendation.genres.map { enrichGenreInfo(it, catalog) },
+            )
+        }
         return McpResponse(
             RecommendationsResponse(
-                bookRecommendations = payload,
+                bookRecommendations = enrichedBooks,
                 totalPages = totalPages,
             ),
-            errors + pagerError,
+            errors + pagerError + catalogResponse.errors,
         )
     }
 

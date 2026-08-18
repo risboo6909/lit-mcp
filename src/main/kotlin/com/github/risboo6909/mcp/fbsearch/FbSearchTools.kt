@@ -6,12 +6,17 @@ import com.github.risboo6909.mcp.fbsearch.extractors.SearchResult
 import com.github.risboo6909.utils.HttpClientInterface
 import com.github.risboo6909.utils.executeWithTimeout
 import org.springaicommunity.mcp.annotation.McpTool
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 
-const val FETCH_TIMEOUT_MILLIS: Long = 60 * 1000
+const val DEFAULT_TOOL_TIMEOUT_MILLIS: Long = 120 * 1000
 
 @Service
-class FbSearchTools(private val httpHelper: HttpClientInterface) {
+class FbSearchTools(
+    private val httpHelper: HttpClientInterface,
+    @Value("\${lit-mcp.tool-timeout-millis:120000}")
+    private val toolTimeoutMillis: Long = DEFAULT_TOOL_TIMEOUT_MILLIS,
+) {
     private val fullTextSearch = FullTextBooksSearch(httpHelper)
 
     @McpTool(
@@ -25,7 +30,7 @@ class FbSearchTools(private val httpHelper: HttpClientInterface) {
             idempotentHint = true,
         ),
     )
-    fun fullTextBooksSearch(): McpResponse<SearchResult> = executeWithTimeout(FETCH_TIMEOUT_MILLIS) {
+    fun fullTextBooksSearch(): McpResponse<SearchResult> = executeWithTimeout(toolTimeoutMillis) {
         fullTextSearch.searchBooks("test", 1, 1)
     }
 }
