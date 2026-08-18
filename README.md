@@ -31,7 +31,8 @@ Project currently supports the following set of tools:
 - `flibustaGetGenresList`: Get all available genres list
 - `flibustaSearchBooksByName`: Search books by name and returns their names and IDs
 - `flibustaGetBookInfoByIds`: Get book info by book ID. Returns detailed info for each book ID such as title, authors, genres, description, download links, user rating, user reviews, etc.
-- `flibustaGetPopularBooksList`: Get popular books, optionally filter by genre slugs, and include a genre breakdown
+- `flibustaGetPopularBooksList`: Get pages from the overall popular-books ranking
+- `flibustaGetTopBooksByGenre`: Scan up to 5 ranking pages by default (10 maximum) and return up to 10 books matching the requested genre slugs
 - `flibustaGetRecommendedBooks`: Get recommended books paginated (50 items per page)
 - `flibustaRecommendedAuthors`: Get recommended authors paginated (50 items per page)
 

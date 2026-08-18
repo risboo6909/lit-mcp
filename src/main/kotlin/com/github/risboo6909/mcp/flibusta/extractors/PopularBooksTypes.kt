@@ -12,13 +12,17 @@ data class PopularBook(
     val genres: List<GenreInfo>? = null,
 )
 
-data class PopularBooksGenreCount(
-    val genre: GenreInfo,
-    val booksCount: Int,
-)
-
 data class PopularBooksResponse(
     val popularBooks: List<PopularBook>? = null,
     val totalPages: Int? = null,
-    val genreBreakdown: List<PopularBooksGenreCount>? = null,
+)
+
+data class TopBooksByGenreResponse(
+    val popularBooks: List<PopularBook>,
+    val requestedLimit: Int,
+    val maxScanPages: Int,
+    val scannedPages: Int,
+    val limitReached: Boolean,
+    val scanLimitReached: Boolean,
+    val totalPages: Int? = null,
 )

@@ -14,14 +14,18 @@ class PopularBooksExtractor(
         startPage: Int,
         endPage: Int,
         genreNames: Set<String> = emptySet(),
-        includeGenreBreakdown: Boolean = false,
+        includeTotalPages: Boolean = true,
     ): McpResponse<PopularBooksResponse> {
         val url = "$POPULAR_BOOKS_URL/${period.suffix}"
-        val (totalPages, pagerError) = getTotalPages(
-            url,
-            mapOf(),
-            httpHelper,
-        )
+        val (totalPages, pagerError) = if (includeTotalPages) {
+            getTotalPages(
+                url,
+                mapOf(),
+                httpHelper,
+            )
+        } else {
+            null to emptyList()
+        }
         val (popularBooks, errors) = getWithPaginationParallel(
             url,
             httpHelper,
@@ -31,7 +35,7 @@ class PopularBooksExtractor(
             endPage,
         )
 
-        if (genreNames.isEmpty() && !includeGenreBreakdown) {
+        if (genreNames.isEmpty()) {
             return McpResponse(
                 PopularBooksResponse(
                     popularBooks,
@@ -48,7 +52,6 @@ class PopularBooksExtractor(
             PopularBooksResponse(
                 filteredBooks,
                 totalPages,
-                genreBreakdown = if (includeGenreBreakdown) buildGenreBreakdown(filteredBooks) else null,
             ),
             errors = errors + pagerError + processedBooksResponse.errors,
         )
@@ -84,18 +87,6 @@ class PopularBooksExtractor(
             errors = genresResponse.errors,
         )
     }
-
-    private fun buildGenreBreakdown(popularBooks: List<PopularBook>): List<PopularBooksGenreCount> = popularBooks
-        .flatMap { it.genres.orEmpty() }
-        .groupBy { normalizeGenreName(it.name) }
-        .values
-        .map { genres ->
-            PopularBooksGenreCount(
-                genre = genres.first(),
-                booksCount = genres.size,
-            )
-        }
-        .sortedWith(compareByDescending<PopularBooksGenreCount> { it.booksCount }.thenBy { it.genre.name })
 
     private fun parse(rawHtml: String, baseUrl: String = FLIBUSTA_BASE_URL): List<PopularBook> {
         val doc = Jsoup.parse(rawHtml, baseUrl)

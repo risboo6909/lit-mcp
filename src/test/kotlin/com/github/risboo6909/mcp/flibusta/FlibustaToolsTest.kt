@@ -1,10 +1,8 @@
 package com.github.risboo6909.mcp.flibusta
 
-import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksPeriod
 import com.github.risboo6909.utils.HttpClientInterface
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
@@ -54,73 +52,7 @@ class FlibustaToolsTest {
         assertEquals(emptyList<String>(), response.errors)
         assertEquals(101, response.payload!!.popularBooks!!.single().book!!.id)
         assertEquals(null, response.payload!!.popularBooks!!.single().genres)
-        assertEquals(null, response.payload!!.genreBreakdown)
         verify(httpHelper, times(1)).fetchMultiplePages(any<List<String>>(), any<Int>())
-    }
-
-    @Test
-    fun popularBooks_filtersByGenreAndIncludesBreakdown() = runBlocking {
-        val popularBooksHtml = """
-            <html><body>
-            <h1 class='title'>Популярные книги</h1>
-            <ul>
-              <li><a href='/a/1'>Science Fiction Author</a> - <a href='/b/101'>Science Fiction Book</a></li>
-              <li><a href='/a/2'>Fantasy Author</a> - <a href='/b/102'>Fantasy Book</a></li>
-            </ul>
-            </body></html>
-        """.trimIndent()
-        val genresHtml = """
-            <html><body>
-            <h1 class='title'>Список жанров</h1>
-            <ul>
-              <li><a href='/g/sf'>Научная фантастика</a></li>
-              <li><a href='/g/sf_fantasy'>Фэнтези</a></li>
-            </ul>
-            </body></html>
-        """.trimIndent()
-        val bookGenres = mapOf(
-            101 to "Научная фантастика",
-            102 to "Фэнтези",
-        )
-
-        whenever(httpHelper.queryGet(eq("https://flibusta.is/g"), any<Int>()))
-            .thenReturn(Result.success(genresHtml))
-        whenever(httpHelper.queryGet(eq("https://flibusta.is/stat/b"), any<Int>()))
-            .thenReturn(Result.success(popularBooksHtml))
-        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { invocation ->
-            val urls = invocation.getArgument<List<String>>(0)
-            if (urls.first().contains("/stat/")) {
-                listOf(popularBooksHtml) to emptyList<String>()
-            } else {
-                urls.map { url ->
-                    val bookId = url.substringAfterLast('/').toInt()
-                    """
-                        <html><body>
-                        <a class='genre' href='/g/$bookId'>${bookGenres.getValue(bookId)}</a>
-                        </body></html>
-                    """.trimIndent()
-                } to emptyList<String>()
-            }
-        }
-
-        val response = flibustaTools.getPopularBooksList(
-            startPage = 0,
-            endPage = 1,
-            period = PopularBooksPeriod.ALL_TIME,
-            genreSlugs = listOf("sf"),
-            includeGenreBreakdown = true,
-        )
-
-        assertEquals(emptyList<String>(), response.errors)
-        assertNotNull(response.payload)
-        assertEquals(listOf(101), response.payload!!.popularBooks!!.map { it.book!!.id })
-        assertEquals(
-            listOf("Научная фантастика"),
-            response.payload!!.popularBooks!!.single().genres!!.map { it.name },
-        )
-        assertEquals("sf", response.payload!!.popularBooks!!.single().genres!!.single().slug)
-        assertEquals(1, response.payload!!.genreBreakdown!!.single().booksCount)
-        assertEquals("Научная фантастика", response.payload!!.genreBreakdown!!.single().genre.name)
     }
 
     @Test
@@ -150,7 +82,7 @@ class FlibustaToolsTest {
     }
 
     @Test
-    fun popularBooks_returnsErrorForUnknownGenreSlug() = runBlocking {
+    fun topBooksByGenre_returnsErrorForUnknownGenreSlug() = runBlocking {
         val genresHtml = """
             <html><body>
             <h1 class='title'>Список жанров</h1>
@@ -159,7 +91,7 @@ class FlibustaToolsTest {
         """.trimIndent()
         whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenReturn(Result.success(genresHtml))
 
-        val response = flibustaTools.getPopularBooksList(
+        val response = flibustaTools.getTopBooksByGenre(
             genreSlugs = listOf("not-a-genre"),
         )
 
@@ -184,6 +116,176 @@ class FlibustaToolsTest {
             listOf("Error: End page must be 0 or greater"),
             response.errors,
         )
+    }
+
+    @Test
+    fun topBooksByGenre_scansPagesUntilRequestedLimitIsReached() = runBlocking {
+        val genresHtml = """
+            <html><body>
+            <h1 class='title'>Список жанров</h1>
+            <ul>
+              <li><a href='/g/sf'>Научная фантастика</a></li>
+              <li><a href='/g/sf_fantasy'>Фэнтези</a></li>
+            </ul>
+            </body></html>
+        """.trimIndent()
+        val pagerHtml = """
+            <html><body>
+            <ul class='pager'><li class='pager-last'><a href='/stat/b?page=3'>3</a></li></ul>
+            </body></html>
+        """.trimIndent()
+        val popularBooksPages = mapOf(
+            0 to """
+                <html><body>
+                <h1 class='title'>Популярные книги</h1>
+                <ul>
+                  <li><a href='/a/1'>Fantasy Author</a> - <a href='/b/101'>Fantasy Book</a></li>
+                  <li><a href='/a/2'>SF Author One</a> - <a href='/b/102'>SF Book One</a></li>
+                </ul>
+                </body></html>
+            """.trimIndent(),
+            1 to """
+                <html><body>
+                <h1 class='title'>Популярные книги</h1>
+                <ul>
+                  <li><a href='/a/3'>SF Author Two</a> - <a href='/b/103'>SF Book Two</a></li>
+                  <li><a href='/a/4'>SF Author Three</a> - <a href='/b/104'>SF Book Three</a></li>
+                </ul>
+                </body></html>
+            """.trimIndent(),
+        )
+        val bookGenres = mapOf(
+            101 to "Фэнтези",
+            102 to "Научная фантастика",
+            103 to "Научная фантастика",
+            104 to "Научная фантастика",
+        )
+        val scannedPages = mutableListOf<Int>()
+
+        whenever(httpHelper.queryGet(eq("https://flibusta.is/g"), any<Int>()))
+            .thenReturn(Result.success(genresHtml))
+        whenever(httpHelper.queryGet(eq("https://flibusta.is/stat/b"), any<Int>()))
+            .thenReturn(Result.success(pagerHtml))
+        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { invocation ->
+            val urls = invocation.getArgument<List<String>>(0)
+            if (urls.first().contains("/stat/")) {
+                val page = urls.single().substringAfter("page=").toInt()
+                scannedPages += page
+                listOf(popularBooksPages.getValue(page)) to emptyList<String>()
+            } else {
+                urls.map { url ->
+                    val bookId = url.substringAfterLast('/').toInt()
+                    """
+                        <html><body>
+                        <a class='genre' href='/g/$bookId'>${bookGenres.getValue(bookId)}</a>
+                        </body></html>
+                    """.trimIndent()
+                } to emptyList<String>()
+            }
+        }
+
+        val response = flibustaTools.getTopBooksByGenre(
+            genreSlugs = listOf("sf"),
+            limit = 3,
+        )
+
+        assertEquals(emptyList<String>(), response.errors)
+        assertEquals(listOf(0, 1), scannedPages)
+        assertEquals(3, response.payload!!.requestedLimit)
+        assertEquals(DEFAULT_TOP_BOOKS_SCAN_PAGES, response.payload!!.maxScanPages)
+        assertEquals(2, response.payload!!.scannedPages)
+        assertEquals(true, response.payload!!.limitReached)
+        assertEquals(false, response.payload!!.scanLimitReached)
+        assertEquals(listOf(102, 103, 104), response.payload!!.popularBooks.map { it.book!!.id })
+        verify(httpHelper, times(1)).queryGet(eq("https://flibusta.is/stat/b"), any<Int>())
+    }
+
+    @Test
+    fun topBooksByGenre_returnsPartialResult_whenScanLimitIsReached() = runBlocking {
+        val genresHtml = """
+            <html><body>
+            <h1 class='title'>Список жанров</h1>
+            <ul>
+              <li><a href='/g/sf'>Научная фантастика</a></li>
+              <li><a href='/g/sf_fantasy'>Фэнтези</a></li>
+            </ul>
+            </body></html>
+        """.trimIndent()
+        val pagerHtml = """
+            <html><body>
+            <ul class='pager'><li class='pager-last'><a href='/stat/b?page=3'>3</a></li></ul>
+            </body></html>
+        """.trimIndent()
+        val popularBooksHtml = """
+            <html><body>
+            <h1 class='title'>Популярные книги</h1>
+            <ul><li><a href='/a/1'>Fantasy Author</a> - <a href='/b/101'>Fantasy Book</a></li></ul>
+            </body></html>
+        """.trimIndent()
+        val fantasyBookHtml = """
+            <html><body>
+            <a class='genre' href='/g/101'>Фэнтези</a>
+            </body></html>
+        """.trimIndent()
+
+        whenever(httpHelper.queryGet(eq("https://flibusta.is/g"), any<Int>()))
+            .thenReturn(Result.success(genresHtml))
+        whenever(httpHelper.queryGet(eq("https://flibusta.is/stat/b"), any<Int>()))
+            .thenReturn(Result.success(pagerHtml))
+        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { invocation ->
+            val urls = invocation.getArgument<List<String>>(0)
+            if (urls.first().contains("/stat/")) {
+                listOf(popularBooksHtml) to emptyList<String>()
+            } else {
+                listOf(fantasyBookHtml) to emptyList<String>()
+            }
+        }
+
+        val response = flibustaTools.getTopBooksByGenre(
+            genreSlugs = listOf("sf"),
+            limit = 1,
+            maxScanPages = 1,
+        )
+
+        assertEquals(emptyList<String>(), response.errors)
+        assertEquals(emptyList<Int>(), response.payload!!.popularBooks.mapNotNull { it.book?.id })
+        assertEquals(1, response.payload!!.maxScanPages)
+        assertEquals(1, response.payload!!.scannedPages)
+        assertEquals(false, response.payload!!.limitReached)
+        assertEquals(true, response.payload!!.scanLimitReached)
+    }
+
+    @Test
+    fun topBooksByGenre_returnsError_whenLimitExceedsMaximum() = runBlocking {
+        val response = flibustaTools.getTopBooksByGenre(
+            genreSlugs = listOf("sf"),
+            limit = MAX_TOP_BOOKS_LIMIT + 1,
+        )
+
+        assertEquals(
+            listOf("Error: Limit must be between 1 and $MAX_TOP_BOOKS_LIMIT"),
+            response.errors,
+        )
+    }
+
+    @Test
+    fun topBooksByGenre_returnsError_whenMaxScanPagesExceedsMaximum() = runBlocking {
+        val response = flibustaTools.getTopBooksByGenre(
+            genreSlugs = listOf("sf"),
+            maxScanPages = MAX_TOP_BOOKS_SCAN_PAGES + 1,
+        )
+
+        assertEquals(
+            listOf("Error: Max scan pages must be between 1 and $MAX_TOP_BOOKS_SCAN_PAGES"),
+            response.errors,
+        )
+    }
+
+    @Test
+    fun topBooksByGenre_returnsError_whenGenresAreEmpty() = runBlocking {
+        val response = flibustaTools.getTopBooksByGenre(genreSlugs = emptyList())
+
+        assertEquals(listOf("Error: At least one genre slug is required"), response.errors)
     }
 
     @Test
