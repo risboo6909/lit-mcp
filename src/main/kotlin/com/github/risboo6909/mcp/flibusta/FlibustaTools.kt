@@ -187,8 +187,6 @@ class FlibustaTools(
             StandardCharsets.UTF_8.toString(),
         )
 
-        val genreSlugsValue = joinListParams(genreSlugs, ",")
-
         validatePageRange<RecommendationsResponse>(startPageValue, endPageValue)
             ?.let { return it }
 
@@ -198,16 +196,27 @@ class FlibustaTools(
             )
         }
 
+        val effectiveEndPage = if (limit == null) {
+            endPageValue
+        } else {
+            minOf(endPageValue, startPageValue + 1)
+        }
+
         return executeWithTimeout(toolTimeoutMillis) {
+            val validatedGenres = genresExtractor.validateGenreSlugs(genreSlugs)
+            if (validatedGenres.errors.isNotEmpty()) {
+                return@executeWithTimeout McpResponse(errors = validatedGenres.errors)
+            }
+
             val response = recExtractor.getRecommendedBooks(
                 mapOf(
                     "view" to "books",
-                    "srcgenre" to genreSlugsValue,
+                    "srcgenre" to joinListParams(validatedGenres.payload, ","),
                     "adata" to "name",
                     "author" to authorNameValue,
                 ),
                 startPageValue,
-                endPageValue,
+                effectiveEndPage,
             )
             if (limit == null) {
                 response
@@ -253,16 +262,19 @@ class FlibustaTools(
         val startPageValue = startPage ?: 0
         val endPageValue = endPage ?: 1
 
-        val genreSlugsValue = joinListParams(genreSlugs, ",")
-
         validatePageRange<RecommendationsResponse>(startPageValue, endPageValue)
             ?.let { return it }
 
         return executeWithTimeout(toolTimeoutMillis) {
+            val validatedGenres = genresExtractor.validateGenreSlugs(genreSlugs)
+            if (validatedGenres.errors.isNotEmpty()) {
+                return@executeWithTimeout McpResponse(errors = validatedGenres.errors)
+            }
+
             recExtractor.getRecommendedAuthors(
                 mapOf(
                     "view" to "authors",
-                    "srcgenre" to genreSlugsValue,
+                    "srcgenre" to joinListParams(validatedGenres.payload, ","),
                 ),
                 startPageValue,
                 endPageValue,

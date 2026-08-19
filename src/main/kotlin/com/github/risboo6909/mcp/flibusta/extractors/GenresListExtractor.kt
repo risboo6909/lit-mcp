@@ -47,6 +47,37 @@ class GenresListExtractor(private val httpHelper: HttpClientInterface) {
         )
     }
 
+    suspend fun validateGenreSlugs(genreSlugs: List<String>?): McpResponse<List<String>> {
+        if (genreSlugs.isNullOrEmpty()) {
+            return McpResponse(payload = emptyList())
+        }
+
+        val requestedSlugs = genreSlugs.map { it.trim().lowercase() }.distinct()
+        if (requestedSlugs.any { it.isBlank() }) {
+            return McpResponse(errors = listOf("Error: Genre slugs must not be blank"))
+        }
+
+        val genresResponse = getAllGenres()
+        if (genresResponse.errors.isNotEmpty()) {
+            return McpResponse(errors = genresResponse.errors)
+        }
+
+        val genresBySlug = genresResponse.payload.orEmpty()
+            .mapNotNull { genre -> genre.slug?.let { it.lowercase() to it } }
+            .toMap()
+        val unknownSlugs = requestedSlugs.filterNot(genresBySlug::containsKey)
+        if (unknownSlugs.isNotEmpty()) {
+            return McpResponse(
+                errors = listOf(
+                    "Error: Unknown genre slugs: ${unknownSlugs.joinToString(", ")}. " +
+                        "Use flibustaGetGenresList to discover valid genre slugs.",
+                ),
+            )
+        }
+
+        return McpResponse(payload = requestedSlugs.map { genresBySlug.getValue(it) })
+    }
+
     private suspend fun fetchAllGenres(): McpResponse<List<GenreInfo>> {
         val result = httpHelper.queryGet(GENRES_LIST_URL)
         return McpResponse(

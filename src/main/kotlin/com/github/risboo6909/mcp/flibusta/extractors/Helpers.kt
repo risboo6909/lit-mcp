@@ -7,38 +7,15 @@ import com.github.risboo6909.utils.joinKeyValueParams
 import com.github.risboo6909.utils.logAndCollectError
 import org.jsoup.Jsoup
 
-suspend fun getTotalPages(
-    url: String,
-    params: Map<String, String>,
-    httpHelper: HttpClientInterface,
-): Pair<Int?, List<String>> {
-    val fullUrl = joinKeyValueParams(url, params)
-    val res = httpHelper.queryGet(fullUrl)
-
-    val rawHtml = res.getOrElse { e ->
-        return null to listOf(
-            "Network error while fetching '$fullUrl': " +
-                "${e.message ?: e::class.simpleName}",
-        )
-    }
-
-    if (rawHtml.isBlank()) {
-        return null to listOf("Empty response body from '$fullUrl'")
-    }
-
-    val doc = Jsoup.parse(rawHtml)
-    val (pages, error) = extractLastPageNumber(doc)
-
-    if (pages != null) {
-        return pages to emptyList()
-    }
-
-    return null to listOf(error ?: "Failed to extract total pages from document")
-}
+data class PaginatedExtraction<T>(
+    val items: List<T>,
+    val totalPages: Int?,
+    val errors: List<String>,
+)
 
 /**
- * This function fetches recommendation pages in parallel from startPage to endPage (exclusive).
- * It is fetching all pages at once, so it is faster for large page ranges.
+ * Fetches pages in parallel from startPage to endPage (exclusive). The same responses are used
+ * both to parse items and to determine the total number of pages, avoiding a separate pager request.
  *
  * This is preferable to the serial version for large page ranges.
  */
@@ -49,7 +26,7 @@ suspend fun <T> getWithPaginationParallel(
     params: Map<String, String>,
     startPage: Int,
     endPage: Int,
-): Pair<List<T>, List<String>> {
+): PaginatedExtraction<T> {
     val allResults = mutableListOf<T>()
     val parseErrors = mutableListOf<String>()
 
@@ -63,7 +40,18 @@ suspend fun <T> getWithPaginationParallel(
         processRawHtml(allResults, parseErrors, url, it, parser)
     }
 
-    return allResults to parseErrors + networkErrors
+    val pagerHtml = payloads.firstOrNull { it.isNotBlank() }
+    val (totalPages, pagerError) = if (pagerHtml == null) {
+        null to "Failed to extract total pages: all fetched responses were empty"
+    } else {
+        extractLastPageNumber(Jsoup.parse(pagerHtml))
+    }
+
+    return PaginatedExtraction(
+        items = allResults,
+        totalPages = totalPages,
+        errors = parseErrors + networkErrors + listOfNotNull(pagerError),
+    )
 }
 
 /**

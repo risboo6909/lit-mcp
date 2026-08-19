@@ -14,12 +14,7 @@ class PopularBooksExtractor(
         endPage: Int,
     ): McpResponse<PopularBooksResponse> {
         val url = "$POPULAR_BOOKS_URL/${period.suffix}"
-        val (totalPages, pagerError) = getTotalPages(
-            url,
-            mapOf(),
-            httpHelper,
-        )
-        val (popularBooks, errors) = getWithPaginationParallel(
+        val result = getWithPaginationParallel(
             url,
             httpHelper,
             ::parse,
@@ -30,10 +25,10 @@ class PopularBooksExtractor(
 
         return McpResponse(
             PopularBooksResponse(
-                popularBooks,
-                totalPages,
+                result.items,
+                result.totalPages,
             ),
-            errors = errors + pagerError,
+            errors = result.errors,
         )
     }
 

@@ -43,7 +43,6 @@ class FlibustaToolsTest {
             <ul><li><a href='/a/1'>Author</a> - <a href='/b/101'>Book</a></li></ul>
             </body></html>
         """.trimIndent()
-        whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenReturn(Result.success(popularBooksHtml))
         whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>()))
             .thenReturn(listOf(popularBooksHtml) to emptyList())
 
@@ -51,7 +50,9 @@ class FlibustaToolsTest {
 
         assertEquals(emptyList<String>(), response.errors)
         assertEquals(101, response.payload!!.popularBooks!!.single().book!!.id)
+        assertEquals(1, response.payload!!.totalPages)
         verify(httpHelper, times(1)).fetchMultiplePages(any<List<String>>(), any<Int>())
+        verify(httpHelper, times(0)).queryGet(any<String>(), any<Int>())
     }
 
     @Test
@@ -108,12 +109,13 @@ class FlibustaToolsTest {
             <ul class='pager'><li class='pager-last'><a href='/rec?view=authors&page=5'>5</a></li></ul>
             </body></html>
         """.trimIndent()
-        whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenReturn(Result.success(rawHtml))
         whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { _ ->
             listOf(rawHtml, rawHtml, rawHtml) to emptyList<String>()
         }
         val response = flibustaTools.getRecommendedAuthors(0, 3)
         assertEquals(emptyList<String>(), response.errors)
+        assertEquals(5, response.payload!!.totalPages)
+        verify(httpHelper, times(0)).queryGet(any<String>(), any<Int>())
     }
 
     @Test
@@ -146,35 +148,50 @@ class FlibustaToolsTest {
     @Test
     fun recommendationsByBook_returnsValidResponse_whenValidInput() = runBlocking {
         // HTML с валидной таблицей рекомендаций + pager
-        val rawHtml = """
+        fun recommendationHtml(books: List<Pair<Int, String>>): String {
+            val rows = books.joinToString("\n") { (bookId, title) ->
+                """
+                <tr>
+                  <td><a href='/a/123'>Author Name</a></td>
+                  <td><a href='/b/$bookId'>$title</a></td>
+                  <td><a href='/g/12'>Genre Name</a></td>
+                  <td>12</td>
+                </tr>
+                """.trimIndent()
+            }
+            return """
             <html><body>
             <form name='formrecs'>
               <table>
                 <tr><th>Author</th><th>Book</th><th>Genre</th><th>Recs</th></tr>
-                <tr>
-                  <td><a href='/a/123'>Author Name</a></td>
-                  <td><a href='/b/456'>Book Title</a></td>
-                  <td><a href='/g/12'>Genre Name</a></td>
-                  <td>12</td>
-                </tr>
+                $rows
               </table>
             </form>
             <ul class='pager'><li class='pager-last'><a href='/rec?view=books&page=5'>5</a></li></ul>
             </body></html>
-        """.trimIndent()
+            """.trimIndent()
+        }
+        val firstPageHtml = recommendationHtml(
+            listOf(
+                456 to "First Book",
+                789 to "Second Book",
+                999 to "Third Book",
+            ),
+        )
         val genresHtml = """
             <html><body>
             <h1 class='title'>Список жанров</h1>
-            <ul><li><a href='/g/genre-slug'>Genre Name</a></li></ul>
+            <ul><li><a href='/g/sf'>Genre Name</a></li></ul>
             </body></html>
         """.trimIndent()
-        whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenReturn(Result.success(rawHtml))
+        whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenReturn(Result.success(firstPageHtml))
         whenever(httpHelper.queryGet(eq("https://flibusta.is/g"), any<Int>()))
             .thenReturn(Result.success(genresHtml))
         val requestedUrls = mutableListOf<String>()
         whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { invocation ->
-            requestedUrls += invocation.getArgument<List<String>>(0)
-            listOf(rawHtml, rawHtml, rawHtml) to emptyList<String>()
+            val urls = invocation.getArgument<List<String>>(0)
+            requestedUrls += urls
+            urls.map { firstPageHtml } to emptyList<String>()
         }
         val response = flibustaTools.getRecommendedBooks(
             startPage = 0,
@@ -183,10 +200,35 @@ class FlibustaToolsTest {
             limit = 2,
         )
         assertEquals(emptyList<String>(), response.errors)
-        assertEquals(2, response.payload!!.bookRecommendations!!.size)
+        assertEquals(listOf(456, 789), response.payload!!.bookRecommendations!!.map { it.book.id })
         assertEquals(12, response.payload!!.bookRecommendations!!.first().genres.single().id)
-        assertEquals("genre-slug", response.payload!!.bookRecommendations!!.first().genres.single().slug)
+        assertEquals("sf", response.payload!!.bookRecommendations!!.first().genres.single().slug)
+        assertEquals(1, requestedUrls.size)
+        assertEquals(true, "page=0" in requestedUrls.single())
         assertEquals(true, requestedUrls.all { "srcgenre=sf" in it })
+    }
+
+    @Test
+    fun recommendationsByBook_returnsErrorForUnknownGenreSlug() = runBlocking {
+        val genresHtml = """
+            <html><body>
+            <h1 class='title'>Список жанров</h1>
+            <ul><li><a href='/g/sf'>Научная фантастика</a></li></ul>
+            </body></html>
+        """.trimIndent()
+        whenever(httpHelper.queryGet(eq("https://flibusta.is/g"), any<Int>()))
+            .thenReturn(Result.success(genresHtml))
+
+        val response = flibustaTools.getRecommendedBooks(genreSlugs = listOf("not-a-genre"))
+
+        assertEquals(
+            listOf(
+                "Error: Unknown genre slugs: not-a-genre. " +
+                    "Use flibustaGetGenresList to discover valid genre slugs.",
+            ),
+            response.errors,
+        )
+        verify(httpHelper, times(0)).fetchMultiplePages(any<List<String>>(), any<Int>())
     }
 
     @Test

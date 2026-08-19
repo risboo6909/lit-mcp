@@ -22,8 +22,7 @@ class RecommendationsExtractor(
         startPage: Int,
         endPage: Int,
     ): McpResponse<RecommendationsResponse> {
-        val (totalPages, pagerError) = getTotalPages(RECOMMENDATIONS_URL, params, httpHelper)
-        val (payload, errors) = getWithPaginationParallel(
+        val result = getWithPaginationParallel(
             RECOMMENDATIONS_URL,
             httpHelper,
             ::parseRecommendedBooks,
@@ -33,7 +32,7 @@ class RecommendationsExtractor(
         )
         val catalogResponse = genresListExtractor.getGenreCatalog()
         val catalog = catalogResponse.payload.orEmpty()
-        val enrichedBooks = payload.map { recommendation ->
+        val enrichedBooks = result.items.map { recommendation ->
             recommendation.copy(
                 genres = recommendation.genres.map { enrichGenreInfo(it, catalog) },
             )
@@ -41,9 +40,9 @@ class RecommendationsExtractor(
         return McpResponse(
             RecommendationsResponse(
                 bookRecommendations = enrichedBooks,
-                totalPages = totalPages,
+                totalPages = result.totalPages,
             ),
-            errors + pagerError + catalogResponse.errors,
+            result.errors + catalogResponse.errors,
         )
     }
 
@@ -52,8 +51,7 @@ class RecommendationsExtractor(
         startPage: Int,
         endPage: Int,
     ): McpResponse<RecommendationsResponse> {
-        val (totalPages, pagerError) = getTotalPages(RECOMMENDATIONS_URL, params, httpHelper)
-        val (payload, errors) = getWithPaginationParallel(
+        val result = getWithPaginationParallel(
             RECOMMENDATIONS_URL,
             httpHelper,
             ::parseRecommendedAuthors,
@@ -63,10 +61,10 @@ class RecommendationsExtractor(
         )
         return McpResponse(
             RecommendationsResponse(
-                authorRecommendations = payload,
-                totalPages = totalPages,
+                authorRecommendations = result.items,
+                totalPages = result.totalPages,
             ),
-            errors + pagerError,
+            result.errors,
         )
     }
 
