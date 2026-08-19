@@ -5,7 +5,6 @@ import com.github.risboo6909.mcp.flibusta.extractors.BookDetails
 import com.github.risboo6909.mcp.flibusta.extractors.BookInfoExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.GenreInfo
 import com.github.risboo6909.mcp.flibusta.extractors.GenresListExtractor
-import com.github.risboo6909.mcp.flibusta.extractors.PopularBook
 import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksPeriod
 import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksResponse
@@ -13,7 +12,6 @@ import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsResponse
 import com.github.risboo6909.mcp.flibusta.extractors.SearchBookInfo
 import com.github.risboo6909.mcp.flibusta.extractors.SearchBooksByName
-import com.github.risboo6909.mcp.flibusta.extractors.TopBooksByGenreResponse
 import com.github.risboo6909.utils.HttpClientInterface
 import com.github.risboo6909.utils.executeWithTimeout
 import com.github.risboo6909.utils.joinListParams
@@ -24,17 +22,14 @@ import org.springframework.stereotype.Service
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
-const val DEFAULT_TOOL_TIMEOUT_MILLIS: Long = 120 * 1000 // Flibusta can be slow sometimes
+const val DEFAULT_TOOL_TIMEOUT_MILLIS: Long = 300 * 1000 // Flibusta can be slow sometimes
 const val MAX_PAGES_PER_REQUEST = 10 // To reduce the time spent waiting for multiple pages
-const val DEFAULT_TOP_BOOKS_LIMIT = 10
-const val MAX_TOP_BOOKS_LIMIT = 10
-const val DEFAULT_TOP_BOOKS_SCAN_PAGES = 5
-const val MAX_TOP_BOOKS_SCAN_PAGES = 10
+const val MAX_RECOMMENDED_BOOKS_LIMIT = 50
 
 @Service
 class FlibustaTools(
     httpHelper: HttpClientInterface,
-    @Value("\${lit-mcp.tool-timeout-millis:120000}")
+    @Value("\${lit-mcp.tool-timeout-millis:300000}")
     private val toolTimeoutMillis: Long,
 ) {
 
@@ -42,7 +37,7 @@ class FlibustaTools(
     private val recExtractor = RecommendationsExtractor(httpHelper, genresExtractor)
     private val bookInfoExtractor = BookInfoExtractor(httpHelper, genresExtractor)
     private val searchBookByName = SearchBooksByName(httpHelper)
-    private val popularBooksExtractor = PopularBooksExtractor(httpHelper, bookInfoExtractor)
+    private val popularBooksExtractor = PopularBooksExtractor(httpHelper)
 
     @McpTool(
         name = "flibustaGetGenresList",
@@ -138,131 +133,19 @@ class FlibustaTools(
         validatePageRange<PopularBooksResponse>(startPageValue, endPageValue)
             ?.let { return@executeWithTimeout it }
 
-        getPopularBooksPage(
-            period = periodValue,
-            startPage = startPageValue,
-            endPage = endPageValue,
-            genreNames = emptySet(),
-        )
-    }
-
-    @McpTool(
-        name = "flibustaGetTopBooksByGenre",
-        title = "Flibusta Get Top Books By Genre",
-        description = "[Flibusta] Get up to $MAX_TOP_BOOKS_LIMIT globally popular books matching the requested " +
-            "genres. Scans popular-book pages in ranking order (default $DEFAULT_TOP_BOOKS_SCAN_PAGES, " +
-            "max $MAX_TOP_BOOKS_SCAN_PAGES pages per request).",
-        annotations = McpTool.McpAnnotations(
-            readOnlyHint = true,
-            openWorldHint = true,
-            destructiveHint = false,
-            idempotentHint = true,
-        ),
-    )
-    fun getTopBooksByGenre(
-        @McpToolParam(
-            description = "Genre slugs to match (required). A book matches when it has any requested genre.",
-        )
-        genreSlugs: List<String>,
-        @McpToolParam(
-            description = "Number of books to return (1-$MAX_TOP_BOOKS_LIMIT). Default: $DEFAULT_TOP_BOOKS_LIMIT.",
-            required = false,
-        )
-        limit: Int? = null,
-        @McpToolParam(
-            description = "Maximum ranking pages to scan (1-$MAX_TOP_BOOKS_SCAN_PAGES). " +
-                "Default: $DEFAULT_TOP_BOOKS_SCAN_PAGES.",
-            required = false,
-        )
-        maxScanPages: Int? = null,
-        @McpToolParam(
-            description = "Popularity period (TODAY/WEEK/ALL_TIME). Default: ALL_TIME.",
-            required = false,
-        )
-        period: PopularBooksPeriod? = null,
-    ): McpResponse<TopBooksByGenreResponse> = executeWithTimeout(toolTimeoutMillis) {
-        val limitValue = limit ?: DEFAULT_TOP_BOOKS_LIMIT
-        if (limitValue !in 1..MAX_TOP_BOOKS_LIMIT) {
-            return@executeWithTimeout McpResponse(
-                errors = listOf("Error: Limit must be between 1 and $MAX_TOP_BOOKS_LIMIT"),
-            )
-        }
-
-        val maxScanPagesValue = maxScanPages ?: DEFAULT_TOP_BOOKS_SCAN_PAGES
-        if (maxScanPagesValue !in 1..MAX_TOP_BOOKS_SCAN_PAGES) {
-            return@executeWithTimeout McpResponse(
-                errors = listOf("Error: Max scan pages must be between 1 and $MAX_TOP_BOOKS_SCAN_PAGES"),
-            )
-        }
-
-        val requestedGenreSlugs = normalizeGenreSlugs(genreSlugs)
-        if (requestedGenreSlugs.isEmpty()) {
-            return@executeWithTimeout McpResponse(
-                errors = listOf("Error: At least one genre slug is required"),
-            )
-        }
-
-        val genreNamesResponse = resolveGenreNames(requestedGenreSlugs)
-        if (genreNamesResponse.errors.isNotEmpty()) {
-            return@executeWithTimeout McpResponse(errors = genreNamesResponse.errors)
-        }
-
-        val popularBooks = mutableListOf<PopularBook>()
-        val seenBookIds = mutableSetOf<Int>()
-        val errors = mutableListOf<String>()
-        var scannedPages = 0
-        var totalPages: Int? = null
-
-        while (
-            scannedPages < maxScanPagesValue &&
-            popularBooks.size < limitValue &&
-            (totalPages == null || scannedPages < totalPages)
-        ) {
-            val pageResponse = getPopularBooksPage(
-                period = period ?: PopularBooksPeriod.ALL_TIME,
-                startPage = scannedPages,
-                endPage = scannedPages + 1,
-                genreNames = genreNamesResponse.payload.orEmpty(),
-                includeTotalPages = scannedPages == 0,
-            )
-            scannedPages++
-            errors += pageResponse.errors
-
-            val pagePayload = pageResponse.payload ?: break
-            if (totalPages == null) {
-                totalPages = pagePayload.totalPages
-            }
-
-            for (popularBook in pagePayload.popularBooks.orEmpty()) {
-                val bookId = popularBook.book?.id
-                if (bookId == null || seenBookIds.add(bookId)) {
-                    popularBooks += popularBook
-                }
-                if (popularBooks.size == limitValue) break
-            }
-        }
-
-        McpResponse(
-            payload = TopBooksByGenreResponse(
-                popularBooks = popularBooks,
-                requestedLimit = limitValue,
-                maxScanPages = maxScanPagesValue,
-                scannedPages = scannedPages,
-                limitReached = popularBooks.size == limitValue,
-                scanLimitReached = popularBooks.size < limitValue &&
-                    scannedPages == maxScanPagesValue &&
-                    (totalPages == null || scannedPages < totalPages),
-                totalPages = totalPages,
-            ),
-            errors = errors.distinct(),
+        popularBooksExtractor.getPopularBooks(
+            periodValue,
+            startPageValue,
+            endPageValue,
         )
     }
 
     @McpTool(
         name = "flibustaGetRecommendedBooks",
         title = "Flibusta Get Recommended Books",
-        description = "[Flibusta] Get recommended books paginated (50 items per page, " +
-            "max $MAX_PAGES_PER_REQUEST pages per request)",
+        description = "[Flibusta] Get books ranked by user recommendation count, optionally filtered by author or " +
+            "genre (50 items per page, max $MAX_PAGES_PER_REQUEST pages per request). Use " +
+            "flibustaGetGenresList to discover valid genre slugs.",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
             openWorldHint = true,
@@ -291,6 +174,11 @@ class FlibustaTools(
             required = false,
         )
         genreSlugs: List<String>? = null,
+        @McpToolParam(
+            description = "Maximum number of books to return (1-$MAX_RECOMMENDED_BOOKS_LIMIT). Default: no limit.",
+            required = false,
+        )
+        limit: Int? = null,
     ): McpResponse<RecommendationsResponse> {
         val startPageValue = startPage ?: 0
         val endPageValue = endPage ?: 1
@@ -304,8 +192,14 @@ class FlibustaTools(
         validatePageRange<RecommendationsResponse>(startPageValue, endPageValue)
             ?.let { return it }
 
+        if (limit != null && limit !in 1..MAX_RECOMMENDED_BOOKS_LIMIT) {
+            return McpResponse(
+                errors = listOf("Error: Limit must be between 1 and $MAX_RECOMMENDED_BOOKS_LIMIT"),
+            )
+        }
+
         return executeWithTimeout(toolTimeoutMillis) {
-            recExtractor.getRecommendedBooks(
+            val response = recExtractor.getRecommendedBooks(
                 mapOf(
                     "view" to "books",
                     "srcgenre" to genreSlugsValue,
@@ -315,6 +209,15 @@ class FlibustaTools(
                 startPageValue,
                 endPageValue,
             )
+            if (limit == null) {
+                response
+            } else {
+                response.copy(
+                    payload = response.payload?.copy(
+                        bookRecommendations = response.payload.bookRecommendations?.take(limit),
+                    ),
+                )
+            }
         }
     }
 
@@ -366,50 +269,6 @@ class FlibustaTools(
             )
         }
     }
-
-    private fun normalizeGenreSlugs(genreSlugs: List<String>?): Set<String> = genreSlugs.orEmpty()
-        .map { it.trim().lowercase() }
-        .filter { it.isNotEmpty() }
-        .toSet()
-
-    private suspend fun resolveGenreNames(requestedGenreSlugs: Set<String>): McpResponse<Set<String>> {
-        if (requestedGenreSlugs.isEmpty()) {
-            return McpResponse(payload = emptySet())
-        }
-
-        val genresResponse = genresExtractor.getAllGenres()
-        if (genresResponse.errors.isNotEmpty()) {
-            return McpResponse(errors = genresResponse.errors)
-        }
-
-        val genresBySlug = genresResponse.payload.orEmpty()
-            .mapNotNull { genre -> genre.slug?.lowercase()?.let { it to genre.name } }
-            .toMap()
-        val unknownGenreSlugs = requestedGenreSlugs - genresBySlug.keys
-        if (unknownGenreSlugs.isNotEmpty()) {
-            return McpResponse(
-                errors = listOf("Unknown genre slugs: ${unknownGenreSlugs.sorted().joinToString(", ")}"),
-            )
-        }
-
-        return McpResponse(
-            payload = requestedGenreSlugs.mapTo(mutableSetOf()) { genresBySlug.getValue(it) },
-        )
-    }
-
-    private suspend fun getPopularBooksPage(
-        period: PopularBooksPeriod,
-        startPage: Int,
-        endPage: Int,
-        genreNames: Set<String>,
-        includeTotalPages: Boolean = true,
-    ): McpResponse<PopularBooksResponse> = popularBooksExtractor.getPopularBooks(
-        period = period,
-        startPage = startPage,
-        endPage = endPage,
-        genreNames = genreNames,
-        includeTotalPages = includeTotalPages,
-    )
 
     private fun <T> validatePageRange(startPage: Int, endPage: Int): McpResponse<T>? {
         if (startPage < 0) {

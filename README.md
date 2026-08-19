@@ -32,8 +32,7 @@ Project currently supports the following set of tools:
 - `flibustaSearchBooksByName`: Search books by name and returns their names and IDs
 - `flibustaGetBookInfoByIds`: Get book info by book ID. Returns detailed info for each book ID such as title, authors, genres, description, download links, user rating, user reviews, etc.
 - `flibustaGetPopularBooksList`: Get pages from the overall popular-books ranking
-- `flibustaGetTopBooksByGenre`: Scan up to 5 ranking pages by default (10 maximum) and return up to 10 books matching the requested genre slugs
-- `flibustaGetRecommendedBooks`: Get recommended books paginated (50 items per page)
+- `flibustaGetRecommendedBooks`: Get books ranked by user recommendations, optionally filtered by author or genre, with an optional result limit of up to 50 books
 - `flibustaRecommendedAuthors`: Get recommended authors paginated (50 items per page)
 
 For more information, please check the source code and the tool definitions.
@@ -70,11 +69,11 @@ Run the downloaded JAR in `stdio` mode with:
 java -jar lit-mcp.jar --transport=stdio
 ```
 
-Flibusta can occasionally respond slowly. The defaults are 120 seconds for a complete MCP tool call and 15 seconds for
+Flibusta can occasionally respond slowly. The defaults are 300 seconds for a complete MCP tool call and 15 seconds for
 an individual HTTP request. They can be overridden when starting the server:
 
 ```bash
-LIT_MCP_TOOL_TIMEOUT_MILLIS=180000 \
+LIT_MCP_TOOL_TIMEOUT_MILLIS=600000 \
 LIT_MCP_HTTP_REQUEST_TIMEOUT_MILLIS=30000 \
 java -jar lit-mcp.jar --transport=stdio
 ```

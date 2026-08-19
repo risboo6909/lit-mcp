@@ -9,12 +9,12 @@ import org.springaicommunity.mcp.annotation.McpTool
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 
-const val DEFAULT_TOOL_TIMEOUT_MILLIS: Long = 120 * 1000
+const val DEFAULT_TOOL_TIMEOUT_MILLIS: Long = 300 * 1000
 
 @Service
 class FbSearchTools(
     private val httpHelper: HttpClientInterface,
-    @Value("\${lit-mcp.tool-timeout-millis:120000}")
+    @Value("\${lit-mcp.tool-timeout-millis:300000}")
     private val toolTimeoutMillis: Long,
 ) {
     private val fullTextSearch = FullTextBooksSearch(httpHelper)
