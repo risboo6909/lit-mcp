@@ -1,17 +1,18 @@
 package com.github.risboo6909.mcp.flibusta
 
 import com.github.risboo6909.mcp.McpResponse
+import com.github.risboo6909.mcp.flibusta.extractors.AuthorSearchInfo
 import com.github.risboo6909.mcp.flibusta.extractors.BookDetails
 import com.github.risboo6909.mcp.flibusta.extractors.BookInfoExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.GenreInfo
 import com.github.risboo6909.mcp.flibusta.extractors.GenresListExtractor
+import com.github.risboo6909.mcp.flibusta.extractors.OpdsExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksPeriod
 import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksResponse
 import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsResponse
 import com.github.risboo6909.mcp.flibusta.extractors.SearchBookInfo
-import com.github.risboo6909.mcp.flibusta.extractors.SearchBooksByName
 import com.github.risboo6909.utils.HttpClientInterface
 import com.github.risboo6909.utils.executeWithTimeout
 import org.springaicommunity.mcp.annotation.McpTool
@@ -22,6 +23,8 @@ import org.springframework.stereotype.Service
 const val DEFAULT_TOOL_TIMEOUT_MILLIS: Long = 300 * 1000 // Flibusta can be slow sometimes
 const val MAX_PAGES_PER_REQUEST = 10 // To reduce the time spent waiting for multiple pages
 const val MAX_RECOMMENDED_BOOKS_LIMIT = 50
+const val DEFAULT_OPDS_BOOKS_LIMIT = 20
+const val MAX_OPDS_BOOKS_LIMIT = 50
 
 @Service
 class FlibustaTools(
@@ -33,7 +36,7 @@ class FlibustaTools(
     private val genresExtractor = GenresListExtractor(httpHelper)
     private val recExtractor = RecommendationsExtractor(httpHelper, genresExtractor)
     private val bookInfoExtractor = BookInfoExtractor(httpHelper, genresExtractor)
-    private val searchBookByName = SearchBooksByName(httpHelper)
+    private val opdsExtractor = OpdsExtractor(httpHelper)
     private val popularBooksExtractor = PopularBooksExtractor(httpHelper)
 
     @McpTool(
@@ -54,7 +57,7 @@ class FlibustaTools(
     @McpTool(
         name = "flibustaSearchBooksByName",
         title = "Flibusta Search Books By Name",
-        description = "[Flibusta/OPDS] Search books by name and return their names, IDs, authors, and URLs",
+        description = "[Flibusta/OPDS] Search books by name and return catalog metadata and download links",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
             openWorldHint = true,
@@ -67,13 +70,115 @@ class FlibustaTools(
             description = "Book name to search for on Flibusta (required)",
         )
         bookName: String,
+        @McpToolParam(
+            description = "Include book descriptions in the response. Default: false",
+            required = false,
+        )
+        includeDescription: Boolean = false,
     ): McpResponse<List<SearchBookInfo>> {
         if (bookName.isBlank()) {
             return McpResponse(errors = listOf("Error: Book name must not be blank"))
         }
 
         return executeWithTimeout(toolTimeoutMillis) {
-            searchBookByName.searchBooksByName(bookName.trim())
+            opdsExtractor.searchBooksByName(bookName.trim(), includeDescription)
+        }
+    }
+
+    @McpTool(
+        name = "flibustaGetNewBooks",
+        title = "Flibusta Get New Books",
+        description = "[Flibusta/OPDS] Get books added during the current weekly catalog window",
+        annotations = McpTool.McpAnnotations(
+            readOnlyHint = true,
+            openWorldHint = true,
+            destructiveHint = false,
+            idempotentHint = true,
+        ),
+    )
+    fun getNewBooks(
+        @McpToolParam(
+            description = "Maximum number of books to return (1-$MAX_OPDS_BOOKS_LIMIT). Default: " +
+                "$DEFAULT_OPDS_BOOKS_LIMIT",
+            required = false,
+        )
+        limit: Int? = null,
+        @McpToolParam(
+            description = "Include book descriptions in the response. Default: false",
+            required = false,
+        )
+        includeDescription: Boolean = false,
+    ): McpResponse<List<SearchBookInfo>> {
+        val limitValue = limit ?: DEFAULT_OPDS_BOOKS_LIMIT
+        validateLimit<List<SearchBookInfo>>(limitValue, MAX_OPDS_BOOKS_LIMIT)?.let { return it }
+
+        return executeWithTimeout(toolTimeoutMillis) {
+            opdsExtractor.getNewBooks(limitValue, includeDescription)
+        }
+    }
+
+    @McpTool(
+        name = "flibustaSearchAuthorsByName",
+        title = "Flibusta Search Authors By Name",
+        description = "[Flibusta/OPDS] Search authors by name and return their IDs, names, URLs, and book counts",
+        annotations = McpTool.McpAnnotations(
+            readOnlyHint = true,
+            openWorldHint = true,
+            destructiveHint = false,
+            idempotentHint = true,
+        ),
+    )
+    fun searchAuthorsByName(
+        @McpToolParam(
+            description = "Author name to search for on Flibusta (required)",
+        )
+        authorName: String,
+    ): McpResponse<List<AuthorSearchInfo>> {
+        if (authorName.isBlank()) {
+            return McpResponse(errors = listOf("Error: Author name must not be blank"))
+        }
+
+        return executeWithTimeout(toolTimeoutMillis) {
+            opdsExtractor.searchAuthorsByName(authorName.trim())
+        }
+    }
+
+    @McpTool(
+        name = "flibustaGetBooksByAuthorId",
+        title = "Flibusta Get Books By Author ID",
+        description = "[Flibusta/OPDS] Get an author's books in alphabetical order by Flibusta author ID",
+        annotations = McpTool.McpAnnotations(
+            readOnlyHint = true,
+            openWorldHint = true,
+            destructiveHint = false,
+            idempotentHint = true,
+        ),
+    )
+    fun getBooksByAuthorId(
+        @McpToolParam(
+            description = "Flibusta author ID (required)",
+        )
+        authorId: Int,
+        @McpToolParam(
+            description = "Maximum number of books to return (1-$MAX_OPDS_BOOKS_LIMIT). Default: " +
+                "$DEFAULT_OPDS_BOOKS_LIMIT",
+            required = false,
+        )
+        limit: Int? = null,
+        @McpToolParam(
+            description = "Include book descriptions in the response. Default: false",
+            required = false,
+        )
+        includeDescription: Boolean = false,
+    ): McpResponse<List<SearchBookInfo>> {
+        if (authorId <= 0) {
+            return McpResponse(errors = listOf("Error: Author ID must be greater than 0"))
+        }
+        val limitValue = limit ?: DEFAULT_OPDS_BOOKS_LIMIT
+        validateLimit<List<SearchBookInfo>>(limitValue, MAX_OPDS_BOOKS_LIMIT)?.let { return it }
+
+        return executeWithTimeout(toolTimeoutMillis) {
+            opdsExtractor.getBooksByAuthorId(authorId, limitValue, includeDescription)
         }
     }
 
@@ -278,7 +383,15 @@ class FlibustaTools(
 
     private fun resolvePageRange(startPage: Int?, endPage: Int?): Pair<Int, Int> {
         val startPageValue = startPage ?: 0
-        return startPageValue to (endPage ?: startPageValue + 1)
+        return startPageValue to (endPage ?: (startPageValue + 1))
+    }
+
+    private fun <T> validateLimit(limit: Int, maxLimit: Int): McpResponse<T>? {
+        return if (limit !in 1..maxLimit) {
+            McpResponse(errors = listOf("Error: Limit must be between 1 and $maxLimit"))
+        } else {
+            null
+        }
     }
 
     private fun <T> validatePageRange(startPage: Int, endPage: Int): McpResponse<T>? {

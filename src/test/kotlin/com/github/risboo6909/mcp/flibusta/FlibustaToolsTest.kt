@@ -40,12 +40,21 @@ class FlibustaToolsTest {
     fun searchBooksByName_usesOpdsAndPreservesResultOrder() = runBlocking {
         val opdsXml = """
             <?xml version="1.0" encoding="utf-8"?>
-            <feed xmlns="http://www.w3.org/2005/Atom">
+            <feed xmlns="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/terms/">
               <entry>
                 <title>Example Book: Alternate Edition</title>
                 <author><name>Example Author</name><uri>/a/201</uri></author>
+                <category term="Science Fiction" label="Science Fiction" />
+                <category term="Adventure" label="Adventure" />
+                <dc:language>en</dc:language>
+                <dc:format>fb2+zip</dc:format>
+                <dc:issued>2024</dc:issued>
+                <content type="text/html">&lt;p&gt;A useful description.&lt;/p&gt;&lt;br/&gt;Downloads: 12 345&lt;br/&gt;Format: fb2</content>
+                <link href="/covers/101.jpg" rel="http://opds-spec.org/image" type="image/jpeg" />
                 <link href="/b/101/fb2" rel="http://opds-spec.org/acquisition/open-access"
                       type="application/fb2+zip" />
+                <link href="/b/101/epub" rel="http://opds-spec.org/acquisition/open-access"
+                      type="application/epub+zip" />
                 <link href="/b/101" rel="alternate" type="text/html" />
                 <id>tag:book:not-a-flibusta-id</id>
               </entry>
@@ -59,7 +68,7 @@ class FlibustaToolsTest {
         """.trimIndent()
         whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenReturn(Result.success(opdsXml))
 
-        val response = flibustaTools.searchBooksByName("Example Book")
+        val response = flibustaTools.searchBooksByName("Example Book", includeDescription = true)
 
         assertEquals(emptyList<String>(), response.errors)
         assertEquals(listOf(101, 102), response.payload!!.map { it.id })
@@ -68,6 +77,17 @@ class FlibustaToolsTest {
         assertEquals(201, response.payload!![0].authors!!.single().id)
         assertEquals("https://flibusta.is/a/201", response.payload!![0].authors!!.single().url)
         assertEquals("https://flibusta.is/b/102", response.payload!![1].url)
+        assertEquals(listOf("Science Fiction", "Adventure"), response.payload!![0].genres)
+        assertEquals("A useful description.", response.payload!![0].description)
+        assertEquals("en", response.payload!![0].language)
+        assertEquals(2024, response.payload!![0].publishYear)
+        assertEquals("https://flibusta.is/covers/101.jpg", response.payload!![0].coverUrl)
+        assertEquals(listOf("fb2", "epub"), response.payload!![0].downloads!!.map { it.format })
+        assertEquals(
+            listOf("https://flibusta.is/b/101/fb2", "https://flibusta.is/b/101/epub"),
+            response.payload!![0].downloads!!.map { it.url },
+        )
+        assertEquals(12345, response.payload!![0].downloadsCount)
 
         val url = argumentCaptor<String>()
         verify(httpHelper, times(1)).queryGet(url.capture(), any<Int>())
@@ -81,6 +101,115 @@ class FlibustaToolsTest {
 
         assertEquals(listOf("Error: Book name must not be blank"), response.errors)
         verify(httpHelper, times(0)).queryGet(any<String>(), any<Int>())
+    }
+
+    @Test
+    fun getNewBooks_fetchesOnlyPagesNeededForLimitAndPreservesOrder() = runBlocking {
+        val requestedUrls = mutableListOf<String>()
+        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { invocation ->
+            val urls = invocation.getArgument<List<String>>(0)
+            requestedUrls += urls
+            listOf(
+                opdsBooksFeed(1..20),
+                opdsBooksFeed(21..40),
+            ) to emptyList<String>()
+        }
+
+        val response = flibustaTools.getNewBooks(limit = 25)
+
+        assertEquals(emptyList<String>(), response.errors)
+        assertEquals((1..25).toList(), response.payload!!.map { it.id })
+        assertEquals(List(25) { null }, response.payload!!.map { it.description })
+        assertEquals(
+            listOf(
+                "https://flibusta.is/opds/new/0/new",
+                "https://flibusta.is/opds/new/1/new/",
+            ),
+            requestedUrls,
+        )
+    }
+
+    @Test
+    fun getNewBooks_returnsErrorWhenLimitExceedsMaximum() = runBlocking {
+        val response = flibustaTools.getNewBooks(limit = MAX_OPDS_BOOKS_LIMIT + 1)
+
+        assertEquals(
+            listOf("Error: Limit must be between 1 and $MAX_OPDS_BOOKS_LIMIT"),
+            response.errors,
+        )
+        verify(httpHelper, times(0)).fetchMultiplePages(any<List<String>>(), any<Int>())
+    }
+
+    @Test
+    fun searchAuthorsByName_parsesOpdsAuthorEntries() = runBlocking {
+        val opdsXml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <entry>
+                <id>tag:author:201</id>
+                <title>Example Author</title>
+                <content type="text">42 books</content>
+                <link href="/opds/author/201" type="application/atom+xml" />
+                <link href="/images/author.jpg" rel="http://opds-spec.org/image" type="image/jpeg" />
+              </entry>
+            </feed>
+        """.trimIndent()
+        whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenReturn(Result.success(opdsXml))
+
+        val response = flibustaTools.searchAuthorsByName("Example Author")
+
+        assertEquals(emptyList<String>(), response.errors)
+        assertEquals(201, response.payload!!.single().id)
+        assertEquals("Example Author", response.payload!!.single().name)
+        assertEquals("https://flibusta.is/a/201", response.payload!!.single().url)
+        assertEquals(42, response.payload!!.single().booksCount)
+        assertEquals("https://flibusta.is/images/author.jpg", response.payload!!.single().imageUrl)
+
+        val url = argumentCaptor<String>()
+        verify(httpHelper, times(1)).queryGet(url.capture(), any<Int>())
+        assertEquals(true, "searchType=authors" in url.firstValue)
+        assertEquals(true, "searchTerm=Example+Author" in url.firstValue)
+    }
+
+    @Test
+    fun searchAuthorsByName_returnsErrorWhenNameIsBlank() = runBlocking {
+        val response = flibustaTools.searchAuthorsByName("  ")
+
+        assertEquals(listOf("Error: Author name must not be blank"), response.errors)
+        verify(httpHelper, times(0)).queryGet(any<String>(), any<Int>())
+    }
+
+    @Test
+    fun getBooksByAuthorId_fetchesAlphabeticalPagesNeededForLimit() = runBlocking {
+        val requestedUrls = mutableListOf<String>()
+        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { invocation ->
+            val urls = invocation.getArgument<List<String>>(0)
+            requestedUrls += urls
+            listOf(
+                opdsBooksFeed(1..20),
+                opdsBooksFeed(21..40),
+            ) to emptyList<String>()
+        }
+
+        val response = flibustaTools.getBooksByAuthorId(authorId = 201, limit = 21)
+
+        assertEquals(emptyList<String>(), response.errors)
+        assertEquals((1..21).toList(), response.payload!!.map { it.id })
+        assertEquals(
+            listOf(
+                "https://flibusta.is/opds/author/201/alphabet",
+                "https://flibusta.is/opds/author/201/alphabet/1",
+            ),
+            requestedUrls,
+        )
+    }
+
+    @Test
+    fun getBooksByAuthorId_returnsErrorWhenAuthorIdIsInvalid() = runBlocking {
+        val response = flibustaTools.getBooksByAuthorId(authorId = 0)
+
+        assertEquals(listOf("Error: Author ID must be greater than 0"), response.errors)
+        verify(httpHelper, times(0)).fetchMultiplePages(any<List<String>>(), any<Int>())
     }
 
     @Test
@@ -340,5 +469,27 @@ class FlibustaToolsTest {
             listOf("Error: End page must be 0 or greater"),
             response.errors,
         )
+    }
+
+    private fun opdsBooksFeed(bookIds: Iterable<Int>): String {
+        val entries = bookIds.joinToString("\n") { bookId ->
+            """
+            <entry>
+              <title>Example Book $bookId</title>
+              <author><name>Example Author</name><uri>/a/201</uri></author>
+              <content type="text/html">&lt;p&gt;Description $bookId&lt;/p&gt;</content>
+              <link href="/b/$bookId/fb2" rel="http://opds-spec.org/acquisition/open-access"
+                    type="application/fb2+zip" />
+              <link href="/b/$bookId" rel="alternate" type="text/html" />
+              <id>tag:book:example-$bookId</id>
+            </entry>
+            """.trimIndent()
+        }
+        return """
+            <?xml version="1.0" encoding="utf-8"?>
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              $entries
+            </feed>
+        """.trimIndent()
     }
 }
