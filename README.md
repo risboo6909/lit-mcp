@@ -52,8 +52,18 @@ curl -fsSL https://github.com/risboo6909/lit-mcp/releases/latest/download/instal
 
 For Claude Code, replace `codex` with `claude`. To configure both clients, use `all`.
 
-The installer verifies the downloaded JAR, stores it in your user data directory, and registers the MCP server using
-the selected client's CLI. It does not configure Claude Desktop; see the manual instructions below for that client.
+On Windows, run the following command in PowerShell:
+
+```powershell
+& ([scriptblock]::Create((irm https://github.com/risboo6909/lit-mcp/releases/latest/download/install.ps1))) codex
+```
+
+For Claude Code, replace `codex` with `claude`. To configure both clients, use `all`. If your PowerShell execution
+policy blocks downloaded scripts, this form does not require changing the policy because it runs the installer in the
+current session.
+
+The installers verify the downloaded JAR, store it in your user data directory, and register the MCP server using
+the selected client's CLI. They do not configure Claude Desktop; see the manual instructions below for that client.
 
 ### Manual installation
 

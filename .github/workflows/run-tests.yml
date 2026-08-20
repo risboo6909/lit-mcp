@@ -35,6 +35,7 @@ jobs:
         run: |
           test -x install.sh
           sh -n install.sh
+          pwsh -NoProfile -File install.ps1 -Help
 
       - name: Run tests
         run: ./gradlew test
