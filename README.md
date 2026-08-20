@@ -28,7 +28,7 @@ Only books in Russian language are supported at the moment, since **Flibusta** m
 Project currently supports the following set of tools:
 
 - `flibustaGetGenresList`: Get all available genres list
-- `flibustaSearchBooksByName`: Search the Flibusta OPDS catalog by book name and return catalog metadata and download links; descriptions are opt-in
+- `flibustaSearchBooksByName`: Search up to 50 books across Flibusta OPDS result pages and return catalog metadata and download links; descriptions are opt-in
 - `flibustaGetNewBooks`: Get books added during the current weekly Flibusta catalog window; descriptions are opt-in
 - `flibustaSearchAuthorsByName`: Search the Flibusta OPDS catalog for authors
 - `flibustaGetBooksByAuthorId`: Get an author's books in alphabetical order by Flibusta author ID; descriptions are opt-in

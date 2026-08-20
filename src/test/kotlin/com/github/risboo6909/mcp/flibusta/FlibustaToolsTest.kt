@@ -104,6 +104,42 @@ class FlibustaToolsTest {
     }
 
     @Test
+    fun searchBooksByName_followsNextLinksUntilLimit() = runBlocking {
+        val requestedUrls = mutableListOf<String>()
+        whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenAnswer { invocation ->
+            val url = invocation.getArgument<String>(0)
+            requestedUrls += url
+            when (requestedUrls.size) {
+                1 -> opdsBooksFeed(1..20, nextHref = "/opds/search/books/page-2")
+                else -> opdsBooksFeed(21..40, nextHref = "/opds/search/books/page-3")
+            }
+        }
+
+        val response = flibustaTools.searchBooksByName("Example Book", limit = 25)
+
+        assertEquals(emptyList<String>(), response.errors)
+        assertEquals((1..25).toList(), response.payload!!.map { it.id })
+        assertEquals(
+            listOf(
+                "https://flibusta.is/opds/search?searchType=books&searchTerm=Example+Book",
+                "https://flibusta.is/opds/search/books/page-2",
+            ),
+            requestedUrls,
+        )
+    }
+
+    @Test
+    fun searchBooksByName_returnsErrorWhenLimitExceedsMaximum() = runBlocking {
+        val response = flibustaTools.searchBooksByName("Example Book", limit = MAX_OPDS_BOOKS_LIMIT + 1)
+
+        assertEquals(
+            listOf("Error: Limit must be between 1 and $MAX_OPDS_BOOKS_LIMIT"),
+            response.errors,
+        )
+        verify(httpHelper, times(0)).queryGet(any<String>(), any<Int>())
+    }
+
+    @Test
     fun getNewBooks_fetchesOnlyPagesNeededForLimitAndPreservesOrder() = runBlocking {
         val requestedUrls = mutableListOf<String>()
         whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { invocation ->
@@ -471,7 +507,7 @@ class FlibustaToolsTest {
         )
     }
 
-    private fun opdsBooksFeed(bookIds: Iterable<Int>): String {
+    private fun opdsBooksFeed(bookIds: Iterable<Int>, nextHref: String? = null): String {
         val entries = bookIds.joinToString("\n") { bookId ->
             """
             <entry>
@@ -488,6 +524,7 @@ class FlibustaToolsTest {
         return """
             <?xml version="1.0" encoding="utf-8"?>
             <feed xmlns="http://www.w3.org/2005/Atom">
+              ${nextHref?.let { "<link href=\"$it\" rel=\"next\" type=\"application/atom+xml\" />" }.orEmpty()}
               $entries
             </feed>
         """.trimIndent()

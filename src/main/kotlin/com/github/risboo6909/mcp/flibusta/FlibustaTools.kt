@@ -71,6 +71,12 @@ class FlibustaTools(
         )
         bookName: String,
         @McpToolParam(
+            description = "Maximum number of books to return (1-$MAX_OPDS_BOOKS_LIMIT). Default: " +
+                "$DEFAULT_OPDS_BOOKS_LIMIT",
+            required = false,
+        )
+        limit: Int? = null,
+        @McpToolParam(
             description = "Include book descriptions in the response. Default: false",
             required = false,
         )
@@ -79,9 +85,11 @@ class FlibustaTools(
         if (bookName.isBlank()) {
             return McpResponse(errors = listOf("Error: Book name must not be blank"))
         }
+        val limitValue = limit ?: DEFAULT_OPDS_BOOKS_LIMIT
+        validateLimit<List<SearchBookInfo>>(limitValue, MAX_OPDS_BOOKS_LIMIT)?.let { return it }
 
         return executeWithTimeout(toolTimeoutMillis) {
-            opdsExtractor.searchBooksByName(bookName.trim(), includeDescription)
+            opdsExtractor.searchBooksByName(bookName.trim(), limitValue, includeDescription)
         }
     }
 

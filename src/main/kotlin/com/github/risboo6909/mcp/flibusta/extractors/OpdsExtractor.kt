@@ -10,13 +10,31 @@ import java.net.URI
 
 class OpdsExtractor(private val httpHelper: HttpClientInterface) {
 
-    suspend fun searchBooksByName(bookName: String, includeDescription: Boolean): McpResponse<List<SearchBookInfo>> {
-        val url = buildSearchUrl("books", bookName)
-        val result = httpHelper.queryGet(url)
-        return McpResponse(
-            payload = parseBookEntries(result.getOrDefault(""), includeDescription),
-            errors = result.exceptionOrNull()?.let { listOf(it.toString()) }.orEmpty(),
-        )
+    suspend fun searchBooksByName(
+        bookName: String,
+        limit: Int,
+        includeDescription: Boolean,
+    ): McpResponse<List<SearchBookInfo>> {
+        val books = mutableListOf<SearchBookInfo>()
+        val errors = mutableListOf<String>()
+        val visitedUrls = mutableSetOf<String>()
+        val maxPages = pageIndexes(limit).count()
+        var nextUrl: String? = buildSearchUrl("books", bookName)
+
+        while (books.size < limit && visitedUrls.size < maxPages) {
+            val currentUrl = nextUrl?.takeIf(visitedUrls::add) ?: break
+            val result = httpHelper.queryGet(currentUrl)
+            if (result.isFailure) {
+                errors += result.exceptionOrNull().toString()
+                break
+            }
+
+            val rawXml = result.getOrDefault("")
+            books += parseBookEntries(rawXml, includeDescription)
+            nextUrl = extractNextPageUrl(rawXml, currentUrl)
+        }
+
+        return McpResponse(payload = books.take(limit), errors = errors)
     }
 
     suspend fun searchAuthorsByName(authorName: String): McpResponse<List<AuthorSearchInfo>> {
@@ -68,6 +86,16 @@ class OpdsExtractor(private val httpHelper: HttpClientInterface) {
             "searchTerm" to searchTerm,
         ),
     )
+
+    private fun extractNextPageUrl(rawXml: String, currentUrl: String): String? {
+        val href = Jsoup.parse(rawXml, currentUrl, Parser.xmlParser())
+            .selectFirst("feed > link[rel=next]")
+            ?.attr("href")
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?: return null
+        return URI(currentUrl).resolve(href).toString()
+    }
 
     private fun parseBookEntries(
         rawXml: String,
