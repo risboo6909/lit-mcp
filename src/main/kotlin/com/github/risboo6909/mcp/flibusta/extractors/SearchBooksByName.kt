@@ -2,11 +2,21 @@ package com.github.risboo6909.mcp.flibusta.extractors
 
 import com.github.risboo6909.mcp.McpResponse
 import com.github.risboo6909.utils.HttpClientInterface
+import com.github.risboo6909.utils.joinKeyValueParams
 import org.jsoup.Jsoup
+import org.jsoup.parser.Parser
+import java.net.URI
 
 class SearchBooksByName(private val httpHelper: HttpClientInterface) {
     suspend fun searchBooksByName(bookName: String): McpResponse<List<SearchBookInfo>> {
-        val result = httpHelper.queryGet("$BOOK_INFO_URL/$bookName")
+        val url = joinKeyValueParams(
+            OPDS_SEARCH_URL,
+            mapOf(
+                "searchType" to "books",
+                "searchTerm" to bookName,
+            ),
+        )
+        val result = httpHelper.queryGet(url)
         return McpResponse(
             parse(result.getOrDefault("")),
             result.exceptionOrNull()?.let {
@@ -15,25 +25,29 @@ class SearchBooksByName(private val httpHelper: HttpClientInterface) {
         )
     }
 
-    private fun parse(rawHtml: String, baseUrl: String = FLIBUSTA_BASE_URL): List<SearchBookInfo> {
-        val doc = Jsoup.parse(rawHtml, baseUrl)
+    private fun parse(rawXml: String, baseUrl: String = FLIBUSTA_BASE_URL): List<SearchBookInfo> {
+        val doc = Jsoup.parse(rawXml, baseUrl, Parser.xmlParser())
 
-        return doc.select("ol > li").mapNotNull { li ->
-            val bookLink = li.selectFirst("a[href^=/b/]") ?: return@mapNotNull null
+        return doc.select("feed > entry").mapNotNull { entry ->
+            val bookLinks = entry.select("link[href^=/b/]")
+            val bookLink = bookLinks.firstOrNull { it.attr("rel") == "alternate" }
+                ?: bookLinks.firstOrNull()
+                ?: return@mapNotNull null
             val bookHref = bookLink.attr("href")
 
-            val bookId = bookHref.substringAfterLast("/").toIntOrNull()
-            val title = bookLink.text().trim()
-            val fullBookUrl = bookLink.attr("abs:href")
+            val bookId = extractIdFromHref(bookHref, "/b") ?: return@mapNotNull null
+            val title = entry.selectFirst("title")?.text()?.trim().orEmpty()
+            if (title.isEmpty()) return@mapNotNull null
+            val fullBookUrl = URI(baseUrl).resolve("/b/$bookId").toString()
 
-            val authors = li.select("a[href^=/a/]").map { a ->
-
-                val href = a.attr("href")
-                val id = href.substringAfterLast("/").toIntOrNull()
+            val authors = entry.select("author").mapNotNull { author ->
+                val name = author.selectFirst("name")?.text()?.trim().orEmpty()
+                val uri = author.selectFirst("uri")?.text()?.trim().orEmpty()
+                if (name.isEmpty()) return@mapNotNull null
                 AuthorInfo(
-                    id = id,
-                    name = a.text().trim(),
-                    url = a.attr("abs:href"),
+                    id = uri.takeIf { it.isNotEmpty() }?.let { extractIdFromHref(it, "/a") },
+                    name = name,
+                    url = uri.takeIf { it.isNotEmpty() }?.let { URI(baseUrl).resolve(it).toString() }.orEmpty(),
                     isTranslator = false,
                 )
             }

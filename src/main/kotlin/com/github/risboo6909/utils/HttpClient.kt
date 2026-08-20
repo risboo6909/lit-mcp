@@ -1,6 +1,5 @@
 package com.github.risboo6909.utils
 
-import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsExtractor
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
@@ -29,7 +28,7 @@ class HttpClient(
 ) : HttpClientInterface {
 
     companion object {
-        val LOG: Logger = LoggerFactory.getLogger(RecommendationsExtractor::class.java.name)
+        val LOG: Logger = LoggerFactory.getLogger(HttpClient::class.java.name)
     }
 
     private val ktorClient = HttpClient(CIO) {

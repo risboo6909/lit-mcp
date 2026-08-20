@@ -5,18 +5,11 @@ import com.github.risboo6909.utils.HttpClientInterface
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 
 class RecommendationsExtractor(
     private val httpHelper: HttpClientInterface,
     private val genresListExtractor: GenresListExtractor,
 ) {
-
-    companion object {
-        val LOG: Logger = LoggerFactory.getLogger(RecommendationsExtractor::class.java.name)
-    }
-
     suspend fun getRecommendedBooks(
         params: Map<String, String>,
         startPage: Int,

@@ -14,13 +14,10 @@ import com.github.risboo6909.mcp.flibusta.extractors.SearchBookInfo
 import com.github.risboo6909.mcp.flibusta.extractors.SearchBooksByName
 import com.github.risboo6909.utils.HttpClientInterface
 import com.github.risboo6909.utils.executeWithTimeout
-import com.github.risboo6909.utils.joinListParams
 import org.springaicommunity.mcp.annotation.McpTool
 import org.springaicommunity.mcp.annotation.McpToolParam
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 
 const val DEFAULT_TOOL_TIMEOUT_MILLIS: Long = 300 * 1000 // Flibusta can be slow sometimes
 const val MAX_PAGES_PER_REQUEST = 10 // To reduce the time spent waiting for multiple pages
@@ -57,7 +54,7 @@ class FlibustaTools(
     @McpTool(
         name = "flibustaSearchBooksByName",
         title = "Flibusta Search Books By Name",
-        description = "[Flibusta] Search books by name and returns their names and IDs",
+        description = "[Flibusta/OPDS] Search books by name and return their names, IDs, authors, and URLs",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
             openWorldHint = true,
@@ -70,10 +67,14 @@ class FlibustaTools(
             description = "Book name to search for on Flibusta (required)",
         )
         bookName: String,
-    ): McpResponse<List<SearchBookInfo>> = executeWithTimeout(toolTimeoutMillis) {
-        searchBookByName.searchBooksByName(
-            URLEncoder.encode(bookName, StandardCharsets.UTF_8.toString()),
-        )
+    ): McpResponse<List<SearchBookInfo>> {
+        if (bookName.isBlank()) {
+            return McpResponse(errors = listOf("Error: Book name must not be blank"))
+        }
+
+        return executeWithTimeout(toolTimeoutMillis) {
+            searchBookByName.searchBooksByName(bookName.trim())
+        }
     }
 
     @McpTool(
@@ -116,7 +117,7 @@ class FlibustaTools(
         )
         startPage: Int? = null,
         @McpToolParam(
-            description = "End page index (0-based, exclusive). Default: 1",
+            description = "End page index (0-based, exclusive). Default: startPage + 1",
             required = false,
         )
         endPage: Int? = null,
@@ -126,8 +127,7 @@ class FlibustaTools(
         )
         period: PopularBooksPeriod? = null,
     ): McpResponse<PopularBooksResponse> = executeWithTimeout(toolTimeoutMillis) {
-        val startPageValue = startPage ?: 0
-        val endPageValue = endPage ?: 1
+        val (startPageValue, endPageValue) = resolvePageRange(startPage, endPage)
         val periodValue = period ?: PopularBooksPeriod.ALL_TIME
 
         validatePageRange<PopularBooksResponse>(startPageValue, endPageValue)
@@ -160,7 +160,7 @@ class FlibustaTools(
         )
         startPage: Int? = null,
         @McpToolParam(
-            description = "End page index (0-based, exclusive). Default: 1",
+            description = "End page index (0-based, exclusive). Default: startPage + 1",
             required = false,
         )
         endPage: Int? = null,
@@ -180,12 +180,7 @@ class FlibustaTools(
         )
         limit: Int? = null,
     ): McpResponse<RecommendationsResponse> {
-        val startPageValue = startPage ?: 0
-        val endPageValue = endPage ?: 1
-        val authorNameValue = URLEncoder.encode(
-            authorName ?: "",
-            StandardCharsets.UTF_8.toString(),
-        )
+        val (startPageValue, endPageValue) = resolvePageRange(startPage, endPage)
 
         validatePageRange<RecommendationsResponse>(startPageValue, endPageValue)
             ?.let { return it }
@@ -211,9 +206,9 @@ class FlibustaTools(
             val response = recExtractor.getRecommendedBooks(
                 mapOf(
                     "view" to "books",
-                    "srcgenre" to joinListParams(validatedGenres.payload, ","),
+                    "srcgenre" to validatedGenres.payload.orEmpty().joinToString(","),
                     "adata" to "name",
-                    "author" to authorNameValue,
+                    "author" to authorName.orEmpty(),
                 ),
                 startPageValue,
                 effectiveEndPage,
@@ -249,7 +244,7 @@ class FlibustaTools(
         )
         startPage: Int? = null,
         @McpToolParam(
-            description = "End page index (0-based, exclusive). Default: 1",
+            description = "End page index (0-based, exclusive). Default: startPage + 1",
             required = false,
         )
         endPage: Int? = null,
@@ -259,8 +254,7 @@ class FlibustaTools(
         )
         genreSlugs: List<String>? = null,
     ): McpResponse<RecommendationsResponse> {
-        val startPageValue = startPage ?: 0
-        val endPageValue = endPage ?: 1
+        val (startPageValue, endPageValue) = resolvePageRange(startPage, endPage)
 
         validatePageRange<RecommendationsResponse>(startPageValue, endPageValue)
             ?.let { return it }
@@ -274,12 +268,17 @@ class FlibustaTools(
             recExtractor.getRecommendedAuthors(
                 mapOf(
                     "view" to "authors",
-                    "srcgenre" to joinListParams(validatedGenres.payload, ","),
+                    "srcgenre" to validatedGenres.payload.orEmpty().joinToString(","),
                 ),
                 startPageValue,
                 endPageValue,
             )
         }
+    }
+
+    private fun resolvePageRange(startPage: Int?, endPage: Int?): Pair<Int, Int> {
+        val startPageValue = startPage ?: 0
+        return startPageValue to (endPage ?: startPageValue + 1)
     }
 
     private fun <T> validatePageRange(startPage: Int, endPage: Int): McpResponse<T>? {

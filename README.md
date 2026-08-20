@@ -6,9 +6,8 @@ Use it responsibly and respect copyright laws.**
 **lit-mcp** allows LLMs to work with popular books websites (currently only **Flibusta**). Initially I started this project to
 learn some basic SpringAI and MCP concepts, but it turned out to be quite useful.
 
-I started with **Flibusta** because it is one of the largest free book repositories. I haven't found any public APIs for it, 
-however it turned out that it is pretty easy to scrape the data I needed from the website by using CSS Selectors. 
-It also doesn't require any authentication to access its contents.
+I started with **Flibusta** because it is one of the largest free book repositories. The project uses Flibusta's OPDS catalog
+where it provides the required data and parses website pages for features that are not exposed through OPDS.
 
 Also, I chose SpringAI and Kotlin due to these technologies being new to me, so this project served as well as a learning experience.
 
@@ -29,7 +28,7 @@ Only books in Russian language are supported at the moment, since **Flibusta** m
 Project currently supports the following set of tools:
 
 - `flibustaGetGenresList`: Get all available genres list
-- `flibustaSearchBooksByName`: Search books by name and returns their names and IDs
+- `flibustaSearchBooksByName`: Search the Flibusta OPDS catalog by book name and return names, IDs, authors, and URLs
 - `flibustaGetBookInfoByIds`: Get book info by book ID. Returns detailed info for each book ID such as title, authors, genres, description, download links, user rating, user reviews, etc.
 - `flibustaGetPopularBooksList`: Get pages from the overall popular-books ranking
 - `flibustaGetRecommendedBooks`: Get books ranked by user recommendations, optionally filtered by author or genre, with an optional result limit of up to 50 books

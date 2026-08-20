@@ -2,7 +2,7 @@
 
 ## Project overview
 
-`lit-mcp` is a Kotlin/Spring Boot MCP server that exposes structured, read-only tools for discovering and inspecting books on public book websites. It supports both stdio and HTTP transports. The project scrapes HTML because the supported sites do not provide the required public APIs.
+`lit-mcp` is a Kotlin/Spring Boot MCP server that exposes structured, read-only tools for discovering and inspecting books on public book websites. It supports both stdio and HTTP transports. The project uses structured catalogs such as OPDS where available and scrapes HTML for site-specific data they do not expose.
 
 The application targets Java 21 and is built with Gradle. Spring AI provides the MCP server integration, Ktor handles outbound HTTP, and Jsoup parses source pages. `README.md` is the source of truth for user-facing installation and usage instructions.
 

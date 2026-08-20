@@ -5,6 +5,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.times
@@ -36,6 +37,53 @@ class FlibustaToolsTest {
     }
 
     @Test
+    fun searchBooksByName_usesOpdsAndPreservesResultOrder() = runBlocking {
+        val opdsXml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <entry>
+                <title>Example Book: Alternate Edition</title>
+                <author><name>Example Author</name><uri>/a/201</uri></author>
+                <link href="/b/101/fb2" rel="http://opds-spec.org/acquisition/open-access"
+                      type="application/fb2+zip" />
+                <link href="/b/101" rel="alternate" type="text/html" />
+                <id>tag:book:not-a-flibusta-id</id>
+              </entry>
+              <entry>
+                <title>Example Book</title>
+                <author><name>Example Author</name><uri>/a/201</uri></author>
+                <link href="/b/102" rel="alternate" type="text/html" />
+                <id>tag:book:also-not-a-flibusta-id</id>
+              </entry>
+            </feed>
+        """.trimIndent()
+        whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenReturn(Result.success(opdsXml))
+
+        val response = flibustaTools.searchBooksByName("Example Book")
+
+        assertEquals(emptyList<String>(), response.errors)
+        assertEquals(listOf(101, 102), response.payload!!.map { it.id })
+        assertEquals(listOf("Example Book: Alternate Edition", "Example Book"), response.payload!!.map { it.title })
+        assertEquals("Example Author", response.payload!![0].authors!!.single().name)
+        assertEquals(201, response.payload!![0].authors!!.single().id)
+        assertEquals("https://flibusta.is/a/201", response.payload!![0].authors!!.single().url)
+        assertEquals("https://flibusta.is/b/102", response.payload!![1].url)
+
+        val url = argumentCaptor<String>()
+        verify(httpHelper, times(1)).queryGet(url.capture(), any<Int>())
+        assertEquals(true, url.firstValue.startsWith("https://flibusta.is/opds/search?searchType=books&"))
+        assertEquals(true, "searchTerm=Example+Book" in url.firstValue)
+    }
+
+    @Test
+    fun searchBooksByName_returnsErrorWhenNameIsBlank() = runBlocking {
+        val response = flibustaTools.searchBooksByName("  ")
+
+        assertEquals(listOf("Error: Book name must not be blank"), response.errors)
+        verify(httpHelper, times(0)).queryGet(any<String>(), any<Int>())
+    }
+
+    @Test
     fun popularBooks_keepsFastPathWithoutGenreOptions() = runBlocking {
         val popularBooksHtml = """
             <html><body>
@@ -53,6 +101,27 @@ class FlibustaToolsTest {
         assertEquals(1, response.payload!!.totalPages)
         verify(httpHelper, times(1)).fetchMultiplePages(any<List<String>>(), any<Int>())
         verify(httpHelper, times(0)).queryGet(any<String>(), any<Int>())
+    }
+
+    @Test
+    fun popularBooks_defaultsEndPageToPageAfterStartPage() = runBlocking {
+        val popularBooksHtml = """
+            <html><body>
+            <h1 class='title'>Popular books</h1>
+            <ul><li><a href='/a/1'>Author</a> - <a href='/b/101'>Book</a></li></ul>
+            </body></html>
+        """.trimIndent()
+        val requestedUrls = mutableListOf<String>()
+        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { invocation ->
+            requestedUrls += invocation.getArgument<List<String>>(0)
+            listOf(popularBooksHtml) to emptyList<String>()
+        }
+
+        val response = flibustaTools.getPopularBooksList(startPage = 3)
+
+        assertEquals(emptyList<String>(), response.errors)
+        assertEquals(1, requestedUrls.size)
+        assertEquals(true, "page=3" in requestedUrls.single())
     }
 
     @Test
@@ -181,7 +250,10 @@ class FlibustaToolsTest {
         val genresHtml = """
             <html><body>
             <h1 class='title'>Список жанров</h1>
-            <ul><li><a href='/g/sf'>Genre Name</a></li></ul>
+            <ul>
+              <li><a href='/g/sf'>Genre Name</a></li>
+              <li><a href='/g/detective'>Detective</a></li>
+            </ul>
             </body></html>
         """.trimIndent()
         whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenReturn(Result.success(firstPageHtml))
@@ -196,7 +268,8 @@ class FlibustaToolsTest {
         val response = flibustaTools.getRecommendedBooks(
             startPage = 0,
             endPage = 3,
-            genreSlugs = listOf("sf"),
+            authorName = "Example Author",
+            genreSlugs = listOf("sf", "detective"),
             limit = 2,
         )
         assertEquals(emptyList<String>(), response.errors)
@@ -205,7 +278,8 @@ class FlibustaToolsTest {
         assertEquals("sf", response.payload!!.bookRecommendations!!.first().genres.single().slug)
         assertEquals(1, requestedUrls.size)
         assertEquals(true, "page=0" in requestedUrls.single())
-        assertEquals(true, requestedUrls.all { "srcgenre=sf" in it })
+        assertEquals(true, "author=Example+Author" in requestedUrls.single())
+        assertEquals(true, "srcgenre=sf%2Cdetective" in requestedUrls.single())
     }
 
     @Test
