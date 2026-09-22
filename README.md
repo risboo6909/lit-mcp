@@ -16,6 +16,23 @@ useful for boilerplate and suggestions, but substantial implementation and super
 coding agents had become capable of implementing, testing, and maintaining changes across the project end to end, so
 the original experiment had effectively succeeded, with product and architecture decisions still guided by a human.
 
+## Token efficiency
+
+`lit-mcp` filters and normalizes Flibusta responses before they enter the model context. A benchmark run on
+September 22, 2026 compared each complete Flibusta HTTP response with the exact MCP result for the same request.
+Token counts use `tiktoken` 0.14.0 with the `o200k_base` encoding.
+
+| Scenario | Direct Flibusta response | MCP result | Reduction |
+| --- | ---: | ---: | ---: |
+| Search for `Ложная слепота`, up to 20 books, descriptions disabled | 3,188 | 807 | 74.7% |
+| First 20 books for author ID `33386`, descriptions disabled | 22,052 | 6,269 | 71.6% |
+| Details for book ID `315739`, discussions disabled | 40,809 | 389 | 99.0% |
+| **Combined** | **66,049** | **7,465** | **88.7%** |
+
+For these cases, the MCP payload was **8.85 times smaller**. This benchmark measures response payloads only; total
+agent token usage also depends on prompts, tool schemas, reasoning, and whether a browser preprocesses or truncates a
+page before returning it to the model.
+
 ## Features and limitations
 
 `lit-mcp` supports both `stdio` and `HTTP` modes. `stdio` mode is useful to run the MCP server locally and connect
