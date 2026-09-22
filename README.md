@@ -47,51 +47,25 @@ prebuilt application.
 ### Automatic installation
 
 The installer downloads the latest JAR, verifies its checksum, stores it in the user data directory, and registers the
-MCP server through the selected client's CLI. Choose the client you want to configure.
+MCP server through the selected client's CLI.
 
-#### Codex
-
-macOS or Linux:
+On macOS or Linux:
 
 ```bash
-curl -fsSL https://github.com/risboo6909/lit-mcp/releases/latest/download/install.sh | sh -s -- codex
+curl -fsSL https://github.com/risboo6909/lit-mcp/releases/latest/download/install.sh | sh -s -- TARGET
 ```
 
 Windows PowerShell:
 
 ```powershell
-& ([scriptblock]::Create((irm https://github.com/risboo6909/lit-mcp/releases/latest/download/install.ps1))) codex
+& ([scriptblock]::Create((irm https://github.com/risboo6909/lit-mcp/releases/latest/download/install.ps1))) TARGET
 ```
 
-#### Claude Code
+Replace `TARGET` with one of these values:
 
-macOS or Linux:
-
-```bash
-curl -fsSL https://github.com/risboo6909/lit-mcp/releases/latest/download/install.sh | sh -s -- claude
-```
-
-Windows PowerShell:
-
-```powershell
-& ([scriptblock]::Create((irm https://github.com/risboo6909/lit-mcp/releases/latest/download/install.ps1))) claude
-```
-
-#### Codex and Claude Code
-
-Use the `all` target to configure both clients at once.
-
-macOS or Linux:
-
-```bash
-curl -fsSL https://github.com/risboo6909/lit-mcp/releases/latest/download/install.sh | sh -s -- all
-```
-
-Windows PowerShell:
-
-```powershell
-& ([scriptblock]::Create((irm https://github.com/risboo6909/lit-mcp/releases/latest/download/install.ps1))) all
-```
+- `codex` — configure Codex CLI, IDE extension, and app
+- `claude` — configure Claude Code
+- `all` — configure both Codex and Claude Code
 
 The PowerShell form runs the downloaded installer in the current session and does not require changing the execution
 policy.
