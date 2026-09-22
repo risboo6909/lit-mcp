@@ -20,8 +20,8 @@ this is not yet feasible for non-trivial projects and lots of human input is sti
 
 ## Features and limitations
 
-`lit-mcp` supports both `stdio` and `HTTP` modes. `stdio` mode is useful to run the MCP server locally and connect 
-it to clients that support `stdio` MCPs (such as Codex, Claude Desktop, or local LLMs running under LM Studio).
+`lit-mcp` supports both `stdio` and `HTTP` modes. `stdio` mode is useful to run the MCP server locally and connect
+it to clients that support `stdio` MCPs (such as Codex, Claude Code, or local LLMs running under LM Studio).
 
 Only books in Russian language are supported at the moment, since **Flibusta** mostly contains russian books.
 
@@ -32,7 +32,7 @@ Project currently supports the following set of tools:
 - `flibustaGetNewBooks`: Get books added during the current weekly Flibusta catalog window; descriptions are opt-in
 - `flibustaSearchAuthorsByName`: Search the Flibusta OPDS catalog for authors
 - `flibustaGetBooksByAuthorId`: Get an author's books in alphabetical order by Flibusta author ID; descriptions are opt-in
-- `flibustaGetBookInfoByIds`: Get detailed book info for up to 50 book IDs, including each book's ID, URL, title, authors, genres, description, download links, user rating, and user reviews
+- `flibustaGetBookInfoByIds`: Get detailed book info for up to 50 book IDs; user discussions are opt-in and limited to 5 per book by default, with a configurable maximum of 20
 - `flibustaGetPopularBooksList`: Get pages from the overall popular-books ranking
 - `flibustaGetRecommendedBooks`: Get books ranked by user recommendations, optionally filtered by author or genre, with an optional result limit of up to 50 books
 - `flibustaRecommendedAuthors`: Get recommended authors paginated (50 items per page)
@@ -46,26 +46,55 @@ prebuilt application.
 
 ### Automatic installation
 
-On macOS or Linux, download and configure `lit-mcp` for Codex with:
+The installer downloads the latest JAR, verifies its checksum, stores it in the user data directory, and registers the
+MCP server through the selected client's CLI. Choose the client you want to configure.
+
+#### Codex
+
+macOS or Linux:
 
 ```bash
 curl -fsSL https://github.com/risboo6909/lit-mcp/releases/latest/download/install.sh | sh -s -- codex
 ```
 
-For Claude Code, replace `codex` with `claude`. To configure both clients, use `all`.
-
-On Windows, run the following command in PowerShell:
+Windows PowerShell:
 
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/risboo6909/lit-mcp/releases/latest/download/install.ps1))) codex
 ```
 
-For Claude Code, replace `codex` with `claude`. To configure both clients, use `all`. If your PowerShell execution
-policy blocks downloaded scripts, this form does not require changing the policy because it runs the installer in the
-current session.
+#### Claude Code
 
-The installers verify the downloaded JAR, store it in your user data directory, and register the MCP server using
-the selected client's CLI. They do not configure Claude Desktop; see the manual instructions below for that client.
+macOS or Linux:
+
+```bash
+curl -fsSL https://github.com/risboo6909/lit-mcp/releases/latest/download/install.sh | sh -s -- claude
+```
+
+Windows PowerShell:
+
+```powershell
+& ([scriptblock]::Create((irm https://github.com/risboo6909/lit-mcp/releases/latest/download/install.ps1))) claude
+```
+
+#### Codex and Claude Code
+
+Use the `all` target to configure both clients at once.
+
+macOS or Linux:
+
+```bash
+curl -fsSL https://github.com/risboo6909/lit-mcp/releases/latest/download/install.sh | sh -s -- all
+```
+
+Windows PowerShell:
+
+```powershell
+& ([scriptblock]::Create((irm https://github.com/risboo6909/lit-mcp/releases/latest/download/install.ps1))) all
+```
+
+The PowerShell form runs the downloaded installer in the current session and does not require changing the execution
+policy.
 
 ### Manual installation
 
@@ -114,7 +143,11 @@ make run_http
 
 On Windows systems, please use `gradlew.bat` to build and run the project.
 
-### Codex
+### Client configuration
+
+Use these instructions when you downloaded the JAR manually or want to manage the MCP configuration yourself.
+
+#### Codex
 
 To connect `lit-mcp` to Codex, add the following to `~/.codex/config.toml`:
 
@@ -126,34 +159,14 @@ args = ["-jar", "/absolute/path/to/lit-mcp.jar", "--transport=stdio"]
 
 Replace `/absolute/path/to/lit-mcp.jar` with the location of the downloaded JAR, then restart Codex.
 
-### Claude Desktop
+#### Claude Code
 
-One of possible ways to try it out is to use Claude Desktop app. You can configure it to use `lit-mcp` in `stdio` mode by following these steps:
+Register the downloaded JAR for your user account, then restart Claude Code:
 
-1. Download and install Claude Desktop from https://www.claude.com/download
-2. Open Claude Desktop and go to Settings.
-3. Goto Developer tab.
-4. Click `Edit Config` button and open `claude_desktop_config.json` file in a text editor.
-5. Add the following block to the `mcpServers` section:
-```json
-{
-  "mcpServers": {
-    "lit-mcp": {
-      "command": "java",
-      "args": [
-        "-jar",
-        "/absolute/path/to/lit-mcp.jar",
-        "--transport=stdio"
-      ]
-    }
-  }
-}
+```bash
+claude mcp add --transport stdio --scope user lit -- \
+  java -jar /absolute/path/to/lit-mcp.jar --transport=stdio
 ```
-6. Save the file and restart Claude Desktop.
-7. Enjoy! Try to ask Claude to search for a book or get book info, e.g. "Find me books by Isaac Asimov and provide links to download them from Flibusta".
-
-Example output from Claude when using `lit-mcp`:
-![example.png](example.png)
 
 ## Contributing
 

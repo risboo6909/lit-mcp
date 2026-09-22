@@ -26,6 +26,8 @@ const val MAX_RECOMMENDED_BOOKS_LIMIT = 50
 const val DEFAULT_OPDS_BOOKS_LIMIT = 20
 const val MAX_OPDS_BOOKS_LIMIT = 50
 const val MAX_BOOK_IDS_PER_REQUEST = 50
+const val DEFAULT_DISCUSSIONS_LIMIT = 5
+const val MAX_DISCUSSIONS_LIMIT = 20
 
 @Service
 class FlibustaTools(
@@ -195,7 +197,7 @@ class FlibustaTools(
         name = "flibustaGetBookInfoByIds",
         title = "Flibusta Get Book Info By IDs",
         description = "[Flibusta] Get book info by book ID. Returns each book's ID, URL, title, authors, genres, " +
-            "description, download links, user rating, user reviews, etc.",
+            "description, download links, and user rating. User discussions are opt-in.",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
             openWorldHint = true,
@@ -208,6 +210,17 @@ class FlibustaTools(
             description = "List of 1-$MAX_BOOK_IDS_PER_REQUEST positive Flibusta book IDs to fetch (required)",
         )
         bookIds: List<Int>,
+        @McpToolParam(
+            description = "Include user discussions in the response. Default: false",
+            required = false,
+        )
+        includeDiscussions: Boolean = false,
+        @McpToolParam(
+            description = "Maximum discussions per book (1-$MAX_DISCUSSIONS_LIMIT). Default: " +
+                "$DEFAULT_DISCUSSIONS_LIMIT",
+            required = false,
+        )
+        discussionsLimit: Int? = null,
     ): McpResponse<List<BookDetails>> {
         if (bookIds.isEmpty()) {
             return McpResponse(errors = listOf("Error: Book IDs must not be empty"))
@@ -220,9 +233,15 @@ class FlibustaTools(
         if (bookIds.any { it <= 0 }) {
             return McpResponse(errors = listOf("Error: Book IDs must be greater than 0"))
         }
+        val discussionsLimitValue = discussionsLimit ?: DEFAULT_DISCUSSIONS_LIMIT
+        if (discussionsLimitValue !in 1..MAX_DISCUSSIONS_LIMIT) {
+            return McpResponse(
+                errors = listOf("Error: Discussions limit must be between 1 and $MAX_DISCUSSIONS_LIMIT"),
+            )
+        }
 
         return executeWithTimeout(toolTimeoutMillis) {
-            bookInfoExtractor.getBookInfoByIds(bookIds)
+            bookInfoExtractor.getBookInfoByIds(bookIds, includeDiscussions, discussionsLimitValue)
         }
     }
 

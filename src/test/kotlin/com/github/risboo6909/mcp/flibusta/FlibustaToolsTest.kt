@@ -334,6 +334,32 @@ class FlibustaToolsTest {
         assertEquals("https://flibusta.is/b/101", response.payload!!.single().url)
         assertEquals(12, response.payload!!.single().genres!!.single().id)
         assertEquals("sf", response.payload!!.single().genres!!.single().slug)
+        assertEquals(null, response.payload!!.single().discussions)
+    }
+
+    @Test
+    fun bookInfo_includesOnlyRequestedNumberOfDiscussions() = runBlocking {
+        val bookHtml = """
+            <html><body>
+            <h1 class='title'>Discussed Book</h1>
+            <span class='container_1'>First discussion</span>
+            <span class='container_2'>Second discussion</span>
+            <span class='container_3'>Third discussion</span>
+            </body></html>
+        """.trimIndent()
+        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>()))
+            .thenReturn(listOf(bookHtml) to emptyList())
+        whenever(httpHelper.queryGet(eq("https://flibusta.is/g"), any<Int>()))
+            .thenReturn(Result.success(""))
+
+        val response = flibustaTools.getBookInfoByIds(
+            bookIds = listOf(101),
+            includeDiscussions = true,
+            discussionsLimit = 2,
+        )
+
+        assertEquals(emptyList<String>(), response.errors)
+        assertEquals(listOf("First discussion", "Second discussion"), response.payload!!.single().discussions)
     }
 
     @Test
@@ -364,6 +390,22 @@ class FlibustaToolsTest {
         assertEquals(
             listOf("Error: Number of book IDs must not exceed $MAX_BOOK_IDS_PER_REQUEST"),
             flibustaTools.getBookInfoByIds((1..MAX_BOOK_IDS_PER_REQUEST + 1).toList()).errors,
+        )
+        verify(httpHelper, times(0)).fetchMultiplePages(any<List<String>>(), any<Int>())
+    }
+
+    @Test
+    fun bookInfo_rejectsInvalidDiscussionsLimitBeforeNetworkRequest(): Unit = runBlocking {
+        assertEquals(
+            listOf("Error: Discussions limit must be between 1 and $MAX_DISCUSSIONS_LIMIT"),
+            flibustaTools.getBookInfoByIds(listOf(101), discussionsLimit = 0).errors,
+        )
+        assertEquals(
+            listOf("Error: Discussions limit must be between 1 and $MAX_DISCUSSIONS_LIMIT"),
+            flibustaTools.getBookInfoByIds(
+                listOf(101),
+                discussionsLimit = MAX_DISCUSSIONS_LIMIT + 1,
+            ).errors,
         )
         verify(httpHelper, times(0)).fetchMultiplePages(any<List<String>>(), any<Int>())
     }

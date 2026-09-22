@@ -12,10 +12,16 @@ class BookInfoExtractor(
     private val genresListExtractor: GenresListExtractor,
 ) {
 
-    suspend fun getBookInfoByIds(bookIds: List<Int>): McpResponse<List<BookDetails>> {
+    suspend fun getBookInfoByIds(
+        bookIds: List<Int>,
+        includeDiscussions: Boolean,
+        discussionsLimit: Int,
+    ): McpResponse<List<BookDetails>> {
         val result = httpHelper.fetchMultiplePages(bookIds.map { "$BOOK_INFO_URL/$it" })
         val books = bookIds.zip(result.first).mapNotNull { (bookId, rawHtml) ->
-            rawHtml.takeIf(String::isNotBlank)?.let { parse(it, bookId) }
+            rawHtml.takeIf(String::isNotBlank)?.let {
+                parse(it, bookId, includeDiscussions, discussionsLimit)
+            }
         }
         val catalogResponse = genresListExtractor.getGenreCatalog()
         val catalog = catalogResponse.payload.orEmpty()
@@ -49,7 +55,13 @@ class BookInfoExtractor(
         )
     }
 
-    private fun parse(rawHtml: String, bookId: Int, baseUrl: String = FLIBUSTA_BASE_URL): BookDetails {
+    private fun parse(
+        rawHtml: String,
+        bookId: Int,
+        includeDiscussions: Boolean,
+        discussionsLimit: Int,
+        baseUrl: String = FLIBUSTA_BASE_URL,
+    ): BookDetails {
         val doc = Jsoup.parse(rawHtml, baseUrl)
         return BookDetails(
             id = bookId,
@@ -64,7 +76,7 @@ class BookInfoExtractor(
             coverUrl = extractCoverImage(doc),
             totalRecommendations = extractTotalRecommendations(doc),
             avgRating = extractAvgRating(doc),
-            discussions = extractDiscussions(doc),
+            discussions = if (includeDiscussions) extractDiscussions(doc).take(discussionsLimit) else null,
         )
     }
 
