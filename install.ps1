@@ -30,6 +30,10 @@ Downloads the latest lit-mcp release and configures it for:
 Environment variables:
   LIT_MCP_INSTALL_DIR       Override the installation directory
   LIT_MCP_RELEASE_BASE_URL  Override the release download URL
+  LIT_MCP_TOOL_TIMEOUT_MILLIS
+                            Override the MCP tool timeout and save it in the client configuration
+  LIT_MCP_HTTP_REQUEST_TIMEOUT_MILLIS
+                            Override the HTTP request timeout and save it in the client configuration
 "@
 }
 
@@ -54,6 +58,13 @@ function Test-Client([string]$Client) {
     }
 }
 
+function Test-PositiveIntegerEnvironment([string]$Name, [string]$Value) {
+    $ParsedValue = 0L
+    if ($Value -and (-not [long]::TryParse($Value, [ref]$ParsedValue) -or $ParsedValue -le 0)) {
+        Fail "$Name must be a positive integer."
+    }
+}
+
 function Install-CodexConfig {
     $PreviousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
@@ -66,7 +77,15 @@ function Install-CodexConfig {
         if ($LASTEXITCODE -ne 0) { Fail "Unable to remove the existing Codex MCP configuration." }
     }
 
-    & $script:CodexCommand mcp add $ServerName -- $script:JavaCommand -jar $script:JarPath --transport=stdio
+    $Arguments = @("mcp", "add")
+    if ($script:ToolTimeoutMillis) {
+        $Arguments += @("--env", "LIT_MCP_TOOL_TIMEOUT_MILLIS=$($script:ToolTimeoutMillis)")
+    }
+    if ($script:HttpRequestTimeoutMillis) {
+        $Arguments += @("--env", "LIT_MCP_HTTP_REQUEST_TIMEOUT_MILLIS=$($script:HttpRequestTimeoutMillis)")
+    }
+    $Arguments += @($ServerName, "--", $script:JavaCommand, "-jar", $script:JarPath, "--transport=stdio")
+    & $script:CodexCommand @Arguments
     if ($LASTEXITCODE -ne 0) { Fail "Unable to configure Codex." }
 }
 
@@ -80,7 +99,15 @@ function Install-ClaudeConfig {
         Write-Host "Updating existing Claude Code MCP configuration..."
     }
 
-    & $script:ClaudeCommand mcp add --transport stdio --scope user $ServerName -- $script:JavaCommand -jar $script:JarPath --transport=stdio
+    $Arguments = @("mcp", "add", "--transport", "stdio", "--scope", "user", $ServerName)
+    if ($script:ToolTimeoutMillis) {
+        $Arguments += @("--env", "LIT_MCP_TOOL_TIMEOUT_MILLIS=$($script:ToolTimeoutMillis)")
+    }
+    if ($script:HttpRequestTimeoutMillis) {
+        $Arguments += @("--env", "LIT_MCP_HTTP_REQUEST_TIMEOUT_MILLIS=$($script:HttpRequestTimeoutMillis)")
+    }
+    $Arguments += @("--", $script:JavaCommand, "-jar", $script:JarPath, "--transport=stdio")
+    & $script:ClaudeCommand @Arguments
     if ($LASTEXITCODE -ne 0) { Fail "Unable to configure Claude Code." }
 }
 
@@ -92,6 +119,11 @@ if (-not $Target) {
     Show-Usage
     exit 2
 }
+
+$script:ToolTimeoutMillis = $env:LIT_MCP_TOOL_TIMEOUT_MILLIS
+$script:HttpRequestTimeoutMillis = $env:LIT_MCP_HTTP_REQUEST_TIMEOUT_MILLIS
+Test-PositiveIntegerEnvironment "LIT_MCP_TOOL_TIMEOUT_MILLIS" $script:ToolTimeoutMillis
+Test-PositiveIntegerEnvironment "LIT_MCP_HTTP_REQUEST_TIMEOUT_MILLIS" $script:HttpRequestTimeoutMillis
 
 $TempDir = $null
 try {

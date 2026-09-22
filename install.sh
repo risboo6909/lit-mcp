@@ -27,6 +27,10 @@ Downloads the latest lit-mcp release and configures it for:
 Environment variables:
   LIT_MCP_INSTALL_DIR       Override the installation directory
   LIT_MCP_RELEASE_BASE_URL  Override the release download URL
+  LIT_MCP_TOOL_TIMEOUT_MILLIS
+                            Override the MCP tool timeout and save it in the client configuration
+  LIT_MCP_HTTP_REQUEST_TIMEOUT_MILLIS
+                            Override the HTTP request timeout and save it in the client configuration
 EOF
 }
 
@@ -74,13 +78,28 @@ check_java() {
     [ "$JAVA_MAJOR" -ge 21 ] || fail "Java 21 or newer is required; found Java $JAVA_MAJOR."
 }
 
+validate_positive_integer() {
+    [ -z "$2" ] && return
+    case "$2" in
+        *[!0-9]*|0*) fail "$1 must be a positive integer." ;;
+    esac
+}
+
 configure_codex() {
     if codex mcp get "$SERVER_NAME" >/dev/null 2>&1; then
         say "Updating existing Codex MCP configuration..."
         codex mcp remove "$SERVER_NAME" >/dev/null
     fi
 
-    codex mcp add "$SERVER_NAME" -- "$JAVA_COMMAND" -jar "$JAR_PATH" --transport=stdio
+    set -- codex mcp add
+    if [ -n "$TOOL_TIMEOUT_MILLIS" ]; then
+        set -- "$@" --env "LIT_MCP_TOOL_TIMEOUT_MILLIS=$TOOL_TIMEOUT_MILLIS"
+    fi
+    if [ -n "$HTTP_REQUEST_TIMEOUT_MILLIS" ]; then
+        set -- "$@" --env "LIT_MCP_HTTP_REQUEST_TIMEOUT_MILLIS=$HTTP_REQUEST_TIMEOUT_MILLIS"
+    fi
+    set -- "$@" "$SERVER_NAME" -- "$JAVA_COMMAND" -jar "$JAR_PATH" --transport=stdio
+    "$@"
 }
 
 configure_claude() {
@@ -88,8 +107,15 @@ configure_claude() {
         say "Updating existing Claude Code MCP configuration..."
     fi
 
-    claude mcp add --transport stdio --scope user "$SERVER_NAME" -- \
-        "$JAVA_COMMAND" -jar "$JAR_PATH" --transport=stdio
+    set -- claude mcp add --transport stdio --scope user "$SERVER_NAME"
+    if [ -n "$TOOL_TIMEOUT_MILLIS" ]; then
+        set -- "$@" --env "LIT_MCP_TOOL_TIMEOUT_MILLIS=$TOOL_TIMEOUT_MILLIS"
+    fi
+    if [ -n "$HTTP_REQUEST_TIMEOUT_MILLIS" ]; then
+        set -- "$@" --env "LIT_MCP_HTTP_REQUEST_TIMEOUT_MILLIS=$HTTP_REQUEST_TIMEOUT_MILLIS"
+    fi
+    set -- "$@" -- "$JAVA_COMMAND" -jar "$JAR_PATH" --transport=stdio
+    "$@"
 }
 
 TARGET="${1:-}"
@@ -100,6 +126,11 @@ case "$TARGET" in
         exit 0
         ;;
 esac
+
+TOOL_TIMEOUT_MILLIS=${LIT_MCP_TOOL_TIMEOUT_MILLIS:-}
+HTTP_REQUEST_TIMEOUT_MILLIS=${LIT_MCP_HTTP_REQUEST_TIMEOUT_MILLIS:-}
+validate_positive_integer LIT_MCP_TOOL_TIMEOUT_MILLIS "$TOOL_TIMEOUT_MILLIS"
+validate_positive_integer LIT_MCP_HTTP_REQUEST_TIMEOUT_MILLIS "$HTTP_REQUEST_TIMEOUT_MILLIS"
 
 check_client "$TARGET"
 check_java

@@ -11,12 +11,10 @@ where it provides the required data and parses website pages for features that a
 
 Also, I chose SpringAI and Kotlin due to these technologies being new to me, so this project served as well as a learning experience.
 
-I was trying to use AI to generate some parts of the code especially for the parts that involve web scraping and parsing HTML.
-As I see it as of now, AI is quite helpful in generating boilerplate code and providing suggestions, 
-but it still requires human supervision to ensure correctness and quality. 
-
-Although my initial goal was to check if I would be able to vibe code the whole project using AI, it turned out that
-this is not yet feasible for non-trivial projects and lots of human input is still required.
+In 2025, I started this project partly to see whether AI could build a non-trivial application. At that point it was
+useful for boilerplate and suggestions, but substantial implementation and supervision were still required. By 2026,
+coding agents had become capable of implementing, testing, and maintaining changes across the project end to end, so
+the original experiment had effectively succeeded, with product and architecture decisions still guided by a human.
 
 ## Features and limitations
 
@@ -70,76 +68,83 @@ Replace `TARGET` with one of these values:
 The PowerShell form runs the downloaded installer in the current session and does not require changing the execution
 policy.
 
-### Manual installation
+To override the runtime timeouts, set one or both variables on the installer process. The installer validates and saves
+them in the selected client configuration:
 
-Download `lit-mcp.jar` from the [latest GitHub release](https://github.com/risboo6909/lit-mcp/releases/latest), or use:
+```bash
+curl -fsSL https://github.com/risboo6909/lit-mcp/releases/latest/download/install.sh |
+  LIT_MCP_TOOL_TIMEOUT_MILLIS=600000 \
+  LIT_MCP_HTTP_REQUEST_TIMEOUT_MILLIS=30000 \
+  sh -s -- TARGET
+```
+
+```powershell
+$env:LIT_MCP_TOOL_TIMEOUT_MILLIS = "600000"
+$env:LIT_MCP_HTTP_REQUEST_TIMEOUT_MILLIS = "30000"
+& ([scriptblock]::Create((irm https://github.com/risboo6909/lit-mcp/releases/latest/download/install.ps1))) TARGET
+```
+
+### Get the JAR manually
+
+Download `lit-mcp.jar` from the [latest GitHub release](https://github.com/risboo6909/lit-mcp/releases/latest), or run:
 
 ```bash
 curl -L https://github.com/risboo6909/lit-mcp/releases/latest/download/lit-mcp.jar -o lit-mcp.jar
 ```
 
-Run the downloaded JAR in `stdio` mode with:
-
-```bash
-java -jar lit-mcp.jar --transport=stdio
-```
-
-Flibusta can occasionally respond slowly. The defaults are 300 seconds for a complete MCP tool call and 15 seconds for
-an individual HTTP request. They can be overridden when starting the server:
-
-```bash
-LIT_MCP_TOOL_TIMEOUT_MILLIS=600000 \
-LIT_MCP_HTTP_REQUEST_TIMEOUT_MILLIS=30000 \
-java -jar lit-mcp.jar --transport=stdio
-```
-
-### Building from source
-
-To build the project, you can use the following command:
+Alternatively, build the JAR from source:
 
 ```bash
 make build
 ```
 
-This will compile the source code and create a runnable JAR file in the `build/libs` directory.
+The built JAR is written to `build/libs`. On Windows, use `gradlew.bat bootJar` instead of `make build`.
 
-To run the MCP server in `stdio` mode, you can use the following command:
+### Configure a client
 
-```bash
-make run_stdio
-```
-
-To run the MCP server in `HTTP` mode, you can use the following command:
-
-```bash
-make run_http
-```
-
-On Windows systems, please use `gradlew.bat` to build and run the project.
-
-### Client configuration
-
-Use these instructions when you downloaded the JAR manually or want to manage the MCP configuration yourself.
+Use these instructions after downloading or building the JAR, or when you want to manage the MCP configuration
+yourself.
 
 #### Codex
 
-To connect `lit-mcp` to Codex, add the following to `~/.codex/config.toml`:
+Register the JAR, then restart Codex:
 
-```toml
-[mcp_servers.lit]
-command = "java"
-args = ["-jar", "/absolute/path/to/lit-mcp.jar", "--transport=stdio"]
+```bash
+codex mcp add lit -- java -jar /absolute/path/to/lit-mcp.jar --transport=stdio
 ```
 
-Replace `/absolute/path/to/lit-mcp.jar` with the location of the downloaded JAR, then restart Codex.
+Replace `/absolute/path/to/lit-mcp.jar` with the JAR location.
 
 #### Claude Code
 
-Register the downloaded JAR for your user account, then restart Claude Code:
+Register the JAR for your user account, then restart Claude Code:
 
 ```bash
 claude mcp add --transport stdio --scope user lit -- \
   java -jar /absolute/path/to/lit-mcp.jar --transport=stdio
+```
+
+### Run standalone
+
+Run a downloaded or built JAR in `stdio` mode:
+
+```bash
+java -jar lit-mcp.jar --transport=stdio
+```
+
+Or run it in HTTP mode:
+
+```bash
+java -jar lit-mcp.jar --transport=http
+```
+
+Flibusta can occasionally respond slowly. The defaults are 300 seconds for a complete MCP tool call and 15 seconds for
+an individual HTTP request. Override them with environment variables when starting the server:
+
+```bash
+LIT_MCP_TOOL_TIMEOUT_MILLIS=600000 \
+LIT_MCP_HTTP_REQUEST_TIMEOUT_MILLIS=30000 \
+java -jar lit-mcp.jar --transport=stdio
 ```
 
 ## Contributing
