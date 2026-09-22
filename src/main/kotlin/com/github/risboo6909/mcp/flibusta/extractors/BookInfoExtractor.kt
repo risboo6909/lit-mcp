@@ -14,7 +14,9 @@ class BookInfoExtractor(
 
     suspend fun getBookInfoByIds(bookIds: List<Int>): McpResponse<List<BookDetails>> {
         val result = httpHelper.fetchMultiplePages(bookIds.map { "$BOOK_INFO_URL/$it" })
-        val books = result.first.filter { it.isNotEmpty() }.map { parse(it) }
+        val books = bookIds.zip(result.first).mapNotNull { (bookId, rawHtml) ->
+            rawHtml.takeIf(String::isNotBlank)?.let { parse(it, bookId) }
+        }
         val catalogResponse = genresListExtractor.getGenreCatalog()
         val catalog = catalogResponse.payload.orEmpty()
         return McpResponse(
@@ -47,9 +49,11 @@ class BookInfoExtractor(
         )
     }
 
-    private fun parse(rawHtml: String, baseUrl: String = FLIBUSTA_BASE_URL): BookDetails {
+    private fun parse(rawHtml: String, bookId: Int, baseUrl: String = FLIBUSTA_BASE_URL): BookDetails {
         val doc = Jsoup.parse(rawHtml, baseUrl)
         return BookDetails(
+            id = bookId,
+            url = "$BOOK_INFO_URL/$bookId",
             title = extractTitle(doc),
             authors = extractAuthors(doc),
             genres = extractGenres(doc),

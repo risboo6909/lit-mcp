@@ -1,10 +1,11 @@
 package com.github.risboo6909.utils
 
-import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
+import jakarta.annotation.PreDestroy
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -12,43 +13,53 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Semaphore
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
-import kotlin.math.min
 import kotlin.math.pow
+import io.ktor.client.HttpClient as KtorHttpClient
 
 const val MAX_CONCURRENT_REQUESTS = 10
 const val MAX_RETRIES = 10
 const val DEFAULT_HTTP_REQUEST_TIMEOUT_MILLIS = 15_000L
 
 @Component
-class HttpClient(
-    @Value("\${lit-mcp.http-request-timeout-millis:15000}")
-    requestTimeoutMillis: Long,
-) : HttpClientInterface {
+class HttpClient internal constructor(private val ktorClient: KtorHttpClient) : HttpClientInterface {
+
+    @Autowired
+    constructor(
+        @Value("\${lit-mcp.http-request-timeout-millis:15000}")
+        requestTimeoutMillis: Long,
+    ) : this(createKtorClient(requestTimeoutMillis))
 
     companion object {
         val LOG: Logger = LoggerFactory.getLogger(HttpClient::class.java.name)
-    }
 
-    private val ktorClient = HttpClient(CIO) {
-        install(HttpTimeout) {
-            this.requestTimeoutMillis = requestTimeoutMillis
+        private fun createKtorClient(requestTimeoutMillis: Long): KtorHttpClient = KtorHttpClient(CIO) {
+            expectSuccess = true
+            install(HttpTimeout) {
+                this.requestTimeoutMillis = requestTimeoutMillis
+            }
         }
     }
+
+    @PreDestroy
+    fun close() = ktorClient.close()
 
     override suspend fun queryGet(url: String, retries: Int): Result<String> {
         var attempt = 0
         var lastError: Throwable? = null
         val initialDelayMs = 200L
 
-        val attempts = min(retries, MAX_RETRIES)
+        val attempts = retries.coerceIn(1, MAX_RETRIES)
 
         while (attempt < attempts) {
             attempt++
             try {
                 return Result.success(ktorClient.get(url).bodyAsText())
-            } catch (e: Throwable) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
                 lastError = e
             }
 
@@ -71,7 +82,7 @@ class HttpClient(
                 async {
                     semaphore.acquire()
                     try {
-                        val res = queryGet(url)
+                        val res = queryGet(url, retries)
                         if (res.isSuccess) {
                             res.getOrNull().orEmpty() to null
                         } else {

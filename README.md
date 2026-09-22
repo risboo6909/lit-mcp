@@ -32,7 +32,7 @@ Project currently supports the following set of tools:
 - `flibustaGetNewBooks`: Get books added during the current weekly Flibusta catalog window; descriptions are opt-in
 - `flibustaSearchAuthorsByName`: Search the Flibusta OPDS catalog for authors
 - `flibustaGetBooksByAuthorId`: Get an author's books in alphabetical order by Flibusta author ID; descriptions are opt-in
-- `flibustaGetBookInfoByIds`: Get book info by book ID. Returns detailed info for each book ID such as title, authors, genres, description, download links, user rating, user reviews, etc.
+- `flibustaGetBookInfoByIds`: Get detailed book info for up to 50 book IDs, including each book's ID, URL, title, authors, genres, description, download links, user rating, and user reviews
 - `flibustaGetPopularBooksList`: Get pages from the overall popular-books ranking
 - `flibustaGetRecommendedBooks`: Get books ranked by user recommendations, optionally filtered by author or genre, with an optional result limit of up to 50 books
 - `flibustaRecommendedAuthors`: Get recommended authors paginated (50 items per page)

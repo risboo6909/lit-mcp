@@ -10,4 +10,5 @@ const val GENRES_LIST_URL = "$FLIBUSTA_BASE_URL/g"
 const val OPDS_SEARCH_URL = "$OPDS_BASE_URL/search"
 
 const val OPDS_BOOKS_PER_PAGE = 20
+const val MAX_OPDS_SEARCH_PAGES = 10
 const val OPDS_IMAGE_REL = "http://opds-spec.org/image"

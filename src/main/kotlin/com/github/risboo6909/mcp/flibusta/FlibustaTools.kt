@@ -25,6 +25,7 @@ const val MAX_PAGES_PER_REQUEST = 10 // To reduce the time spent waiting for mul
 const val MAX_RECOMMENDED_BOOKS_LIMIT = 50
 const val DEFAULT_OPDS_BOOKS_LIMIT = 20
 const val MAX_OPDS_BOOKS_LIMIT = 50
+const val MAX_BOOK_IDS_PER_REQUEST = 50
 
 @Service
 class FlibustaTools(
@@ -193,8 +194,8 @@ class FlibustaTools(
     @McpTool(
         name = "flibustaGetBookInfoByIds",
         title = "Flibusta Get Book Info By IDs",
-        description = "[Flibusta] Get book info by book ID. Returns detailed info for each book ID such as " +
-            "title, authors, genres, description, download links, user rating, user reviews, etc.",
+        description = "[Flibusta] Get book info by book ID. Returns each book's ID, URL, title, authors, genres, " +
+            "description, download links, user rating, user reviews, etc.",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
             openWorldHint = true,
@@ -204,11 +205,25 @@ class FlibustaTools(
     )
     fun getBookInfoByIds(
         @McpToolParam(
-            description = "List of Flibusta book IDs to fetch (required)",
+            description = "List of 1-$MAX_BOOK_IDS_PER_REQUEST positive Flibusta book IDs to fetch (required)",
         )
         bookIds: List<Int>,
-    ): McpResponse<List<BookDetails>> = executeWithTimeout(toolTimeoutMillis) {
-        bookInfoExtractor.getBookInfoByIds(bookIds)
+    ): McpResponse<List<BookDetails>> {
+        if (bookIds.isEmpty()) {
+            return McpResponse(errors = listOf("Error: Book IDs must not be empty"))
+        }
+        if (bookIds.size > MAX_BOOK_IDS_PER_REQUEST) {
+            return McpResponse(
+                errors = listOf("Error: Number of book IDs must not exceed $MAX_BOOK_IDS_PER_REQUEST"),
+            )
+        }
+        if (bookIds.any { it <= 0 }) {
+            return McpResponse(errors = listOf("Error: Book IDs must be greater than 0"))
+        }
+
+        return executeWithTimeout(toolTimeoutMillis) {
+            bookInfoExtractor.getBookInfoByIds(bookIds)
+        }
     }
 
     @McpTool(

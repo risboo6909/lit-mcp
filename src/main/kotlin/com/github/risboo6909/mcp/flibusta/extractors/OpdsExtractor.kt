@@ -18,10 +18,9 @@ class OpdsExtractor(private val httpHelper: HttpClientInterface) {
         val books = mutableListOf<SearchBookInfo>()
         val errors = mutableListOf<String>()
         val visitedUrls = mutableSetOf<String>()
-        val maxPages = pageIndexes(limit).count()
         var nextUrl: String? = buildSearchUrl("books", bookName)
 
-        while (books.size < limit && visitedUrls.size < maxPages) {
+        while (books.size < limit && visitedUrls.size < MAX_OPDS_SEARCH_PAGES) {
             val currentUrl = nextUrl?.takeIf(visitedUrls::add) ?: break
             val result = httpHelper.queryGet(currentUrl)
             if (result.isFailure) {

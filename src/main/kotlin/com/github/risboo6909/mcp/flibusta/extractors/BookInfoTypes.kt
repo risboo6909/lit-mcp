@@ -3,6 +3,8 @@ package com.github.risboo6909.mcp.flibusta.extractors
 data class DownloadLink(val format: String, val url: String)
 
 data class BookDetails(
+    val id: Int,
+    val url: String,
     val title: String?,
     val authors: List<AuthorInfo>?,
     val genres: List<GenreInfo>?,

@@ -18,7 +18,7 @@ class FlibustaToolsTest {
     private val flibustaTools = FlibustaTools(httpHelper, DEFAULT_TOOL_TIMEOUT_MILLIS)
 
     @Test
-    fun genresList_cachesSuccessfulResponse() = runBlocking {
+    fun genresList_cachesSuccessfulResponse(): Unit = runBlocking {
         val genresHtml = """
             <html><body>
             <h1 class='title'>Список жанров</h1>
@@ -96,7 +96,7 @@ class FlibustaToolsTest {
     }
 
     @Test
-    fun searchBooksByName_returnsErrorWhenNameIsBlank() = runBlocking {
+    fun searchBooksByName_returnsErrorWhenNameIsBlank(): Unit = runBlocking {
         val response = flibustaTools.searchBooksByName("  ")
 
         assertEquals(listOf("Error: Book name must not be blank"), response.errors)
@@ -129,7 +129,26 @@ class FlibustaToolsTest {
     }
 
     @Test
-    fun searchBooksByName_returnsErrorWhenLimitExceedsMaximum() = runBlocking {
+    fun searchBooksByName_continuesAfterSparsePageUntilLimit() = runBlocking {
+        val requestedUrls = mutableListOf<String>()
+        whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenAnswer { invocation ->
+            val url = invocation.getArgument<String>(0)
+            requestedUrls += url
+            when (requestedUrls.size) {
+                1 -> opdsBooksFeed(1..10, nextHref = "/opds/search/books/page-2")
+                else -> opdsBooksFeed(11..20)
+            }
+        }
+
+        val response = flibustaTools.searchBooksByName("Example Book", limit = 20)
+
+        assertEquals(emptyList<String>(), response.errors)
+        assertEquals((1..20).toList(), response.payload!!.map { it.id })
+        assertEquals(2, requestedUrls.size)
+    }
+
+    @Test
+    fun searchBooksByName_returnsErrorWhenLimitExceedsMaximum(): Unit = runBlocking {
         val response = flibustaTools.searchBooksByName("Example Book", limit = MAX_OPDS_BOOKS_LIMIT + 1)
 
         assertEquals(
@@ -166,7 +185,7 @@ class FlibustaToolsTest {
     }
 
     @Test
-    fun getNewBooks_returnsErrorWhenLimitExceedsMaximum() = runBlocking {
+    fun getNewBooks_returnsErrorWhenLimitExceedsMaximum(): Unit = runBlocking {
         val response = flibustaTools.getNewBooks(limit = MAX_OPDS_BOOKS_LIMIT + 1)
 
         assertEquals(
@@ -208,7 +227,7 @@ class FlibustaToolsTest {
     }
 
     @Test
-    fun searchAuthorsByName_returnsErrorWhenNameIsBlank() = runBlocking {
+    fun searchAuthorsByName_returnsErrorWhenNameIsBlank(): Unit = runBlocking {
         val response = flibustaTools.searchAuthorsByName("  ")
 
         assertEquals(listOf("Error: Author name must not be blank"), response.errors)
@@ -241,7 +260,7 @@ class FlibustaToolsTest {
     }
 
     @Test
-    fun getBooksByAuthorId_returnsErrorWhenAuthorIdIsInvalid() = runBlocking {
+    fun getBooksByAuthorId_returnsErrorWhenAuthorIdIsInvalid(): Unit = runBlocking {
         val response = flibustaTools.getBooksByAuthorId(authorId = 0)
 
         assertEquals(listOf("Error: Author ID must be greater than 0"), response.errors)
@@ -249,7 +268,7 @@ class FlibustaToolsTest {
     }
 
     @Test
-    fun popularBooks_keepsFastPathWithoutGenreOptions() = runBlocking {
+    fun popularBooks_keepsFastPathWithoutGenreOptions(): Unit = runBlocking {
         val popularBooksHtml = """
             <html><body>
             <h1 class='title'>Популярные книги</h1>
@@ -311,8 +330,42 @@ class FlibustaToolsTest {
         val response = flibustaTools.getBookInfoByIds(listOf(101))
 
         assertEquals(emptyList<String>(), response.errors)
+        assertEquals(101, response.payload!!.single().id)
+        assertEquals("https://flibusta.is/b/101", response.payload!!.single().url)
         assertEquals(12, response.payload!!.single().genres!!.single().id)
         assertEquals("sf", response.payload!!.single().genres!!.single().slug)
+    }
+
+    @Test
+    fun bookInfo_preservesRequestedIdWhenAnotherPageFails() = runBlocking {
+        val bookHtml = "<html><body><h1 class='title'>Second Book</h1></body></html>"
+        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>()))
+            .thenReturn(listOf("", bookHtml) to listOf("Failed to fetch first book"))
+        whenever(httpHelper.queryGet(eq("https://flibusta.is/g"), any<Int>()))
+            .thenReturn(Result.success(""))
+
+        val response = flibustaTools.getBookInfoByIds(listOf(101, 202))
+
+        assertEquals(listOf("Failed to fetch first book"), response.errors)
+        assertEquals(202, response.payload!!.single().id)
+        assertEquals("https://flibusta.is/b/202", response.payload!!.single().url)
+    }
+
+    @Test
+    fun bookInfo_rejectsInvalidIdListsBeforeNetworkRequest(): Unit = runBlocking {
+        assertEquals(
+            listOf("Error: Book IDs must not be empty"),
+            flibustaTools.getBookInfoByIds(emptyList()).errors,
+        )
+        assertEquals(
+            listOf("Error: Book IDs must be greater than 0"),
+            flibustaTools.getBookInfoByIds(listOf(0)).errors,
+        )
+        assertEquals(
+            listOf("Error: Number of book IDs must not exceed $MAX_BOOK_IDS_PER_REQUEST"),
+            flibustaTools.getBookInfoByIds((1..MAX_BOOK_IDS_PER_REQUEST + 1).toList()).errors,
+        )
+        verify(httpHelper, times(0)).fetchMultiplePages(any<List<String>>(), any<Int>())
     }
 
     @Test
@@ -336,7 +389,7 @@ class FlibustaToolsTest {
     }
 
     @Test
-    fun recommendationsByAuthor_returnsValidResponse_whenValidInput() = runBlocking {
+    fun recommendationsByAuthor_returnsValidResponse_whenValidInput(): Unit = runBlocking {
         // HTML без таблицы (пустой список рекомендаций) но с pager чтобы не было ошибки парсинга пагинации
         val rawHtml = """
             <html><body>
@@ -448,7 +501,7 @@ class FlibustaToolsTest {
     }
 
     @Test
-    fun recommendationsByBook_returnsErrorForUnknownGenreSlug() = runBlocking {
+    fun recommendationsByBook_returnsErrorForUnknownGenreSlug(): Unit = runBlocking {
         val genresHtml = """
             <html><body>
             <h1 class='title'>Список жанров</h1>
