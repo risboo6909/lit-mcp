@@ -83,7 +83,7 @@ class FlibustaTools(
             description = "Include book descriptions in the response. Default: false",
             required = false,
         )
-        includeDescription: Boolean = false,
+        includeDescription: Boolean? = null,
     ): McpResponse<List<SearchBookInfo>> {
         if (bookName.isBlank()) {
             return McpResponse(errors = listOf("Error: Book name must not be blank"))
@@ -92,7 +92,7 @@ class FlibustaTools(
         validateLimit<List<SearchBookInfo>>(limitValue, MAX_OPDS_BOOKS_LIMIT)?.let { return it }
 
         return executeWithTimeout(toolTimeoutMillis) {
-            opdsExtractor.searchBooksByName(bookName.trim(), limitValue, includeDescription)
+            opdsExtractor.searchBooksByName(bookName.trim(), limitValue, includeDescription ?: false)
         }
     }
 
@@ -118,13 +118,13 @@ class FlibustaTools(
             description = "Include book descriptions in the response. Default: false",
             required = false,
         )
-        includeDescription: Boolean = false,
+        includeDescription: Boolean? = null,
     ): McpResponse<List<SearchBookInfo>> {
         val limitValue = limit ?: DEFAULT_OPDS_BOOKS_LIMIT
         validateLimit<List<SearchBookInfo>>(limitValue, MAX_OPDS_BOOKS_LIMIT)?.let { return it }
 
         return executeWithTimeout(toolTimeoutMillis) {
-            opdsExtractor.getNewBooks(limitValue, includeDescription)
+            opdsExtractor.getNewBooks(limitValue, includeDescription ?: false)
         }
     }
 
@@ -180,7 +180,7 @@ class FlibustaTools(
             description = "Include book descriptions in the response. Default: false",
             required = false,
         )
-        includeDescription: Boolean = false,
+        includeDescription: Boolean? = null,
     ): McpResponse<List<SearchBookInfo>> {
         if (authorId <= 0) {
             return McpResponse(errors = listOf("Error: Author ID must be greater than 0"))
@@ -189,7 +189,7 @@ class FlibustaTools(
         validateLimit<List<SearchBookInfo>>(limitValue, MAX_OPDS_BOOKS_LIMIT)?.let { return it }
 
         return executeWithTimeout(toolTimeoutMillis) {
-            opdsExtractor.getBooksByAuthorId(authorId, limitValue, includeDescription)
+            opdsExtractor.getBooksByAuthorId(authorId, limitValue, includeDescription ?: false)
         }
     }
 
@@ -214,7 +214,7 @@ class FlibustaTools(
             description = "Include user discussions in the response. Default: false",
             required = false,
         )
-        includeDiscussions: Boolean = false,
+        includeDiscussions: Boolean? = null,
         @McpToolParam(
             description = "Maximum discussions per book (1-$MAX_DISCUSSIONS_LIMIT). Default: " +
                 "$DEFAULT_DISCUSSIONS_LIMIT",
@@ -241,7 +241,7 @@ class FlibustaTools(
         }
 
         return executeWithTimeout(toolTimeoutMillis) {
-            bookInfoExtractor.getBookInfoByIds(bookIds, includeDiscussions, discussionsLimitValue)
+            bookInfoExtractor.getBookInfoByIds(bookIds, includeDiscussions ?: false, discussionsLimitValue)
         }
     }
 
