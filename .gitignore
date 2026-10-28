@@ -65,3 +65,6 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+# Local feature plans
+/plans/

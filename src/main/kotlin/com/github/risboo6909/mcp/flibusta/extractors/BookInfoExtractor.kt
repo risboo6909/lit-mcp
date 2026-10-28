@@ -17,10 +17,11 @@ class BookInfoExtractor(
         includeDiscussions: Boolean,
         discussionsLimit: Int,
     ): McpResponse<List<BookDetails>> {
-        val result = httpHelper.fetchMultiplePages(bookIds.map { "$BOOK_INFO_URL/$it" })
-        val books = bookIds.zip(result.first).mapNotNull { (bookId, rawHtml) ->
-            rawHtml.takeIf(String::isNotBlank)?.let {
-                parse(it, bookId, includeDiscussions, discussionsLimit)
+        val result = httpHelper.fetchPages(bookIds.map { "$BOOK_INFO_URL/$it" })
+        val books = bookIds.zip(result.pages).mapNotNull { (bookId, page) ->
+            page?.body?.takeIf(String::isNotBlank)?.let {
+                parse(it, bookId, includeDiscussions, discussionsLimit, MIRROR_PLACEHOLDER_ORIGIN)
+                    .resolveMirrorLinks(page.sourceUrl, page.mirrorOrigins)
             }
         }
         val catalogResponse = genresListExtractor.getGenreCatalog()
@@ -31,17 +32,18 @@ class BookInfoExtractor(
                     genres = book.genres?.map { enrichGenreInfo(it, catalog) },
                 )
             },
-            errors = result.second + catalogResponse.errors,
+            errors = result.errors + catalogResponse.errors,
         )
     }
 
     suspend fun getGenresByBookIds(bookIds: List<Int>): McpResponse<Map<Int, List<GenreInfo>>> {
-        val result = httpHelper.fetchMultiplePages(bookIds.map { "$BOOK_INFO_URL/$it" })
-        val genresByBookId = bookIds.zip(result.first).mapNotNull { (bookId, rawHtml) ->
-            if (rawHtml.isBlank()) {
+        val result = httpHelper.fetchPages(bookIds.map { "$BOOK_INFO_URL/$it" })
+        val genresByBookId = bookIds.zip(result.pages).mapNotNull { (bookId, page) ->
+            if (page == null || page.body.isBlank()) {
                 null
             } else {
-                bookId to extractGenres(Jsoup.parse(rawHtml, FLIBUSTA_BASE_URL))
+                bookId to extractGenres(Jsoup.parse(page.body, MIRROR_PLACEHOLDER_ORIGIN))
+                    .map { it.resolveMirrorLinks(page.sourceUrl, page.mirrorOrigins) }
             }
         }.toMap()
         val catalogResponse = genresListExtractor.getGenreCatalog()
@@ -51,7 +53,7 @@ class BookInfoExtractor(
             payload = genresByBookId.mapValues { (_, genres) ->
                 genres.map { enrichGenreInfo(it, catalog) }
             },
-            errors = result.second + catalogResponse.errors,
+            errors = result.errors + catalogResponse.errors,
         )
     }
 
@@ -65,7 +67,7 @@ class BookInfoExtractor(
         val doc = Jsoup.parse(rawHtml, baseUrl)
         return BookDetails(
             id = bookId,
-            url = "$BOOK_INFO_URL/$bookId",
+            url = "$baseUrl/b/$bookId",
             title = extractTitle(doc),
             authors = extractAuthors(doc),
             genres = extractGenres(doc),

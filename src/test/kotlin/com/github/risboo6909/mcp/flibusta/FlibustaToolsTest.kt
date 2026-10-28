@@ -14,7 +14,18 @@ import org.mockito.kotlin.whenever
 
 class FlibustaToolsTest {
 
-    private val httpHelper = mock<HttpClientInterface>()
+    private val transport = mock<HttpClientInterface>()
+    private val httpHelper = object : HttpClientInterface {
+        override suspend fun queryGet(url: String, retries: Int): Result<String> = transport.queryGet(url, retries)
+
+        override suspend fun fetchMultiplePages(urls: List<String>, retries: Int): Pair<List<String>, List<String>> =
+            transport.fetchMultiplePages(urls, retries)
+
+        override fun preferredMirrorOrigin(): String = "https://flibusta.is"
+
+        override fun allowedMirrorOrigins(): Set<String> =
+            setOf("https://flibusta.is", "https://flibusta.site", "https://flisland.net")
+    }
     private val flibustaTools = FlibustaTools(httpHelper, DEFAULT_TOOL_TIMEOUT_MILLIS)
 
     @Test
@@ -25,7 +36,7 @@ class FlibustaToolsTest {
             <ul><li><a href='/g/sf'>Научная фантастика</a></li></ul>
             </body></html>
         """.trimIndent()
-        whenever(httpHelper.queryGet(eq("https://flibusta.is/g"), any<Int>()))
+        whenever(transport.queryGet(eq("https://flibusta.is/g"), any<Int>()))
             .thenReturn(Result.success(genresHtml))
 
         val firstResponse = flibustaTools.getGenresList()
@@ -33,7 +44,7 @@ class FlibustaToolsTest {
 
         assertEquals(firstResponse, secondResponse)
         assertEquals("sf", secondResponse.payload!!.single().slug)
-        verify(httpHelper, times(1)).queryGet(eq("https://flibusta.is/g"), any<Int>())
+        verify(transport, times(1)).queryGet(eq("https://flibusta.is/g"), any<Int>())
     }
 
     @Test
@@ -66,7 +77,7 @@ class FlibustaToolsTest {
               </entry>
             </feed>
         """.trimIndent()
-        whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenReturn(Result.success(opdsXml))
+        whenever(transport.queryGet(any<String>(), any<Int>())).thenReturn(Result.success(opdsXml))
 
         val response = flibustaTools.searchBooksByName("Example Book", includeDescription = true)
 
@@ -90,7 +101,7 @@ class FlibustaToolsTest {
         assertEquals(12345, response.payload!![0].downloadsCount)
 
         val url = argumentCaptor<String>()
-        verify(httpHelper, times(1)).queryGet(url.capture(), any<Int>())
+        verify(transport, times(1)).queryGet(url.capture(), any<Int>())
         assertEquals(true, url.firstValue.startsWith("https://flibusta.is/opds/search?searchType=books&"))
         assertEquals(true, "searchTerm=Example+Book" in url.firstValue)
     }
@@ -100,13 +111,13 @@ class FlibustaToolsTest {
         val response = flibustaTools.searchBooksByName("  ")
 
         assertEquals(listOf("Error: Book name must not be blank"), response.errors)
-        verify(httpHelper, times(0)).queryGet(any<String>(), any<Int>())
+        verify(transport, times(0)).queryGet(any<String>(), any<Int>())
     }
 
     @Test
     fun searchBooksByName_followsNextLinksUntilLimit() = runBlocking {
         val requestedUrls = mutableListOf<String>()
-        whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenAnswer { invocation ->
+        whenever(transport.queryGet(any<String>(), any<Int>())).thenAnswer { invocation ->
             val url = invocation.getArgument<String>(0)
             requestedUrls += url
             when (requestedUrls.size) {
@@ -131,7 +142,7 @@ class FlibustaToolsTest {
     @Test
     fun searchBooksByName_continuesAfterSparsePageUntilLimit() = runBlocking {
         val requestedUrls = mutableListOf<String>()
-        whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenAnswer { invocation ->
+        whenever(transport.queryGet(any<String>(), any<Int>())).thenAnswer { invocation ->
             val url = invocation.getArgument<String>(0)
             requestedUrls += url
             when (requestedUrls.size) {
@@ -155,13 +166,13 @@ class FlibustaToolsTest {
             listOf("Error: Limit must be between 1 and $MAX_OPDS_BOOKS_LIMIT"),
             response.errors,
         )
-        verify(httpHelper, times(0)).queryGet(any<String>(), any<Int>())
+        verify(transport, times(0)).queryGet(any<String>(), any<Int>())
     }
 
     @Test
     fun getNewBooks_fetchesOnlyPagesNeededForLimitAndPreservesOrder() = runBlocking {
         val requestedUrls = mutableListOf<String>()
-        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { invocation ->
+        whenever(transport.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { invocation ->
             val urls = invocation.getArgument<List<String>>(0)
             requestedUrls += urls
             listOf(
@@ -192,7 +203,7 @@ class FlibustaToolsTest {
             listOf("Error: Limit must be between 1 and $MAX_OPDS_BOOKS_LIMIT"),
             response.errors,
         )
-        verify(httpHelper, times(0)).fetchMultiplePages(any<List<String>>(), any<Int>())
+        verify(transport, times(0)).fetchMultiplePages(any<List<String>>(), any<Int>())
     }
 
     @Test
@@ -209,7 +220,7 @@ class FlibustaToolsTest {
               </entry>
             </feed>
         """.trimIndent()
-        whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenReturn(Result.success(opdsXml))
+        whenever(transport.queryGet(any<String>(), any<Int>())).thenReturn(Result.success(opdsXml))
 
         val response = flibustaTools.searchAuthorsByName("Example Author")
 
@@ -221,7 +232,7 @@ class FlibustaToolsTest {
         assertEquals("https://flibusta.is/images/author.jpg", response.payload!!.single().imageUrl)
 
         val url = argumentCaptor<String>()
-        verify(httpHelper, times(1)).queryGet(url.capture(), any<Int>())
+        verify(transport, times(1)).queryGet(url.capture(), any<Int>())
         assertEquals(true, "searchType=authors" in url.firstValue)
         assertEquals(true, "searchTerm=Example+Author" in url.firstValue)
     }
@@ -231,13 +242,13 @@ class FlibustaToolsTest {
         val response = flibustaTools.searchAuthorsByName("  ")
 
         assertEquals(listOf("Error: Author name must not be blank"), response.errors)
-        verify(httpHelper, times(0)).queryGet(any<String>(), any<Int>())
+        verify(transport, times(0)).queryGet(any<String>(), any<Int>())
     }
 
     @Test
     fun getBooksByAuthorId_fetchesAlphabeticalPagesNeededForLimit() = runBlocking {
         val requestedUrls = mutableListOf<String>()
-        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { invocation ->
+        whenever(transport.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { invocation ->
             val urls = invocation.getArgument<List<String>>(0)
             requestedUrls += urls
             listOf(
@@ -264,7 +275,7 @@ class FlibustaToolsTest {
         val response = flibustaTools.getBooksByAuthorId(authorId = 0)
 
         assertEquals(listOf("Error: Author ID must be greater than 0"), response.errors)
-        verify(httpHelper, times(0)).fetchMultiplePages(any<List<String>>(), any<Int>())
+        verify(transport, times(0)).fetchMultiplePages(any<List<String>>(), any<Int>())
     }
 
     @Test
@@ -275,7 +286,7 @@ class FlibustaToolsTest {
             <ul><li><a href='/a/1'>Author</a> - <a href='/b/101'>Book</a></li></ul>
             </body></html>
         """.trimIndent()
-        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>()))
+        whenever(transport.fetchMultiplePages(any<List<String>>(), any<Int>()))
             .thenReturn(listOf(popularBooksHtml) to emptyList())
 
         val response = flibustaTools.getPopularBooksList()
@@ -283,8 +294,8 @@ class FlibustaToolsTest {
         assertEquals(emptyList<String>(), response.errors)
         assertEquals(101, response.payload!!.popularBooks!!.single().book!!.id)
         assertEquals(1, response.payload!!.totalPages)
-        verify(httpHelper, times(1)).fetchMultiplePages(any<List<String>>(), any<Int>())
-        verify(httpHelper, times(0)).queryGet(any<String>(), any<Int>())
+        verify(transport, times(1)).fetchMultiplePages(any<List<String>>(), any<Int>())
+        verify(transport, times(0)).queryGet(any<String>(), any<Int>())
     }
 
     @Test
@@ -296,7 +307,7 @@ class FlibustaToolsTest {
             </body></html>
         """.trimIndent()
         val requestedUrls = mutableListOf<String>()
-        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { invocation ->
+        whenever(transport.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { invocation ->
             requestedUrls += invocation.getArgument<List<String>>(0)
             listOf(popularBooksHtml) to emptyList<String>()
         }
@@ -322,9 +333,9 @@ class FlibustaToolsTest {
             <ul><li><a href='/g/sf'>Научная фантастика</a></li></ul>
             </body></html>
         """.trimIndent()
-        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>()))
+        whenever(transport.fetchMultiplePages(any<List<String>>(), any<Int>()))
             .thenReturn(listOf(bookHtml) to emptyList())
-        whenever(httpHelper.queryGet(eq("https://flibusta.is/g"), any<Int>()))
+        whenever(transport.queryGet(eq("https://flibusta.is/g"), any<Int>()))
             .thenReturn(Result.success(genresHtml))
 
         val response = flibustaTools.getBookInfoByIds(listOf(101))
@@ -347,9 +358,9 @@ class FlibustaToolsTest {
             <span class='container_3'>Third discussion</span>
             </body></html>
         """.trimIndent()
-        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>()))
+        whenever(transport.fetchMultiplePages(any<List<String>>(), any<Int>()))
             .thenReturn(listOf(bookHtml) to emptyList())
-        whenever(httpHelper.queryGet(eq("https://flibusta.is/g"), any<Int>()))
+        whenever(transport.queryGet(eq("https://flibusta.is/g"), any<Int>()))
             .thenReturn(Result.success(""))
 
         val response = flibustaTools.getBookInfoByIds(
@@ -365,9 +376,9 @@ class FlibustaToolsTest {
     @Test
     fun bookInfo_preservesRequestedIdWhenAnotherPageFails() = runBlocking {
         val bookHtml = "<html><body><h1 class='title'>Second Book</h1></body></html>"
-        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>()))
+        whenever(transport.fetchMultiplePages(any<List<String>>(), any<Int>()))
             .thenReturn(listOf("", bookHtml) to listOf("Failed to fetch first book"))
-        whenever(httpHelper.queryGet(eq("https://flibusta.is/g"), any<Int>()))
+        whenever(transport.queryGet(eq("https://flibusta.is/g"), any<Int>()))
             .thenReturn(Result.success(""))
 
         val response = flibustaTools.getBookInfoByIds(listOf(101, 202))
@@ -391,7 +402,7 @@ class FlibustaToolsTest {
             listOf("Error: Number of book IDs must not exceed $MAX_BOOK_IDS_PER_REQUEST"),
             flibustaTools.getBookInfoByIds((1..MAX_BOOK_IDS_PER_REQUEST + 1).toList()).errors,
         )
-        verify(httpHelper, times(0)).fetchMultiplePages(any<List<String>>(), any<Int>())
+        verify(transport, times(0)).fetchMultiplePages(any<List<String>>(), any<Int>())
     }
 
     @Test
@@ -407,7 +418,7 @@ class FlibustaToolsTest {
                 discussionsLimit = MAX_DISCUSSIONS_LIMIT + 1,
             ).errors,
         )
-        verify(httpHelper, times(0)).fetchMultiplePages(any<List<String>>(), any<Int>())
+        verify(transport, times(0)).fetchMultiplePages(any<List<String>>(), any<Int>())
     }
 
     @Test
@@ -438,13 +449,13 @@ class FlibustaToolsTest {
             <ul class='pager'><li class='pager-last'><a href='/rec?view=authors&page=5'>5</a></li></ul>
             </body></html>
         """.trimIndent()
-        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { _ ->
+        whenever(transport.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { _ ->
             listOf(rawHtml, rawHtml, rawHtml) to emptyList<String>()
         }
         val response = flibustaTools.getRecommendedAuthors(0, 3)
         assertEquals(emptyList<String>(), response.errors)
         assertEquals(5, response.payload!!.totalPages)
-        verify(httpHelper, times(0)).queryGet(any<String>(), any<Int>())
+        verify(transport, times(0)).queryGet(any<String>(), any<Int>())
     }
 
     @Test
@@ -516,11 +527,11 @@ class FlibustaToolsTest {
             </ul>
             </body></html>
         """.trimIndent()
-        whenever(httpHelper.queryGet(any<String>(), any<Int>())).thenReturn(Result.success(firstPageHtml))
-        whenever(httpHelper.queryGet(eq("https://flibusta.is/g"), any<Int>()))
+        whenever(transport.queryGet(any<String>(), any<Int>())).thenReturn(Result.success(firstPageHtml))
+        whenever(transport.queryGet(eq("https://flibusta.is/g"), any<Int>()))
             .thenReturn(Result.success(genresHtml))
         val requestedUrls = mutableListOf<String>()
-        whenever(httpHelper.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { invocation ->
+        whenever(transport.fetchMultiplePages(any<List<String>>(), any<Int>())).thenAnswer { invocation ->
             val urls = invocation.getArgument<List<String>>(0)
             requestedUrls += urls
             urls.map { firstPageHtml } to emptyList<String>()
@@ -550,7 +561,7 @@ class FlibustaToolsTest {
             <ul><li><a href='/g/sf'>Научная фантастика</a></li></ul>
             </body></html>
         """.trimIndent()
-        whenever(httpHelper.queryGet(eq("https://flibusta.is/g"), any<Int>()))
+        whenever(transport.queryGet(eq("https://flibusta.is/g"), any<Int>()))
             .thenReturn(Result.success(genresHtml))
 
         val response = flibustaTools.getRecommendedBooks(genreSlugs = listOf("not-a-genre"))
@@ -562,7 +573,7 @@ class FlibustaToolsTest {
             ),
             response.errors,
         )
-        verify(httpHelper, times(0)).fetchMultiplePages(any<List<String>>(), any<Int>())
+        verify(transport, times(0)).fetchMultiplePages(any<List<String>>(), any<Int>())
     }
 
     @Test

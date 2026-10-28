@@ -11,7 +11,8 @@ The application targets Java 21 and is built with Gradle. Spring AI provides the
 - The application entry point selects the transport and starts Spring.
 - MCP tool services define the public tool contracts, validate inputs, apply operation-level timeouts, and coordinate extraction.
 - Extractors fetch and parse remote pages into typed response models. Keep site-specific parsing in this layer.
-- Shared utilities own HTTP behavior, retries, concurrency limits, parameter handling, logging, and timeout execution.
+- `HttpClient` owns Ktor transport, redirects, ordinary requests, and page batching. `MirrorManager` is site-agnostic: it accepts mirror origins and optional source aliases, owns preferred-mirror state and failover policy, and implements `MirrorAccess`; `HttpClient` delegates that contract to it. Keep source-specific mirror lists and aliases in that source's configuration package.
+- Shared utilities own HTTP behavior, retry limits, concurrency, parameter handling, logging, and timeout execution. Retry-count parameters mean total attempts, including the initial request; the current default is 3 and the cap is 10.
 - Unit tests normally mock the HTTP interface and use small representative HTML fixtures. A Spring context test protects dependency-injection wiring; external integration tests must tolerate the site being unavailable.
 
 Prefer these boundaries over depending on current class names. New sources and tools should follow the same separation.
@@ -25,6 +26,7 @@ Prefer these boundaries over depending on current class names. New sources and t
 - Use the shared HTTP abstraction instead of creating ad hoc clients. Respect existing retry, concurrency, pagination, and timeout limits.
 - Preserve inexpensive fast paths. Avoid fetching every book page when the requested response does not need detailed data.
 - Prefer server configuration properties or environment variables for operational settings rather than adding infrastructure controls to every tool call.
+- Keep common interfaces and utility defaults source-agnostic. Configure allowed origins in the concrete source configuration rather than hard-coding site domains in shared contracts.
 - Keep changes focused and preserve unrelated work. Do not change MCP registrations, installed JARs, releases, or remote state unless the user explicitly asks.
 - When replacing an installed JAR, build and validate the new artifact first, retain a recoverable backup, and verify the installed artifact with an MCP handshake.
 

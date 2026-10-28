@@ -21,16 +21,20 @@ class OpdsExtractor(private val httpHelper: HttpClientInterface) {
         var nextUrl: String? = buildSearchUrl("books", bookName)
 
         while (books.size < limit && visitedUrls.size < MAX_OPDS_SEARCH_PAGES) {
-            val currentUrl = nextUrl?.takeIf(visitedUrls::add) ?: break
-            val result = httpHelper.queryGet(currentUrl)
+            val currentUrl = nextUrl ?: break
+            val currentUri = URI(currentUrl)
+            val pageKey = currentUri.rawPath.orEmpty() + (currentUri.rawQuery?.let { "?$it" } ?: "")
+            if (!visitedUrls.add(pageKey)) break
+            val result = httpHelper.queryPage(currentUrl)
             if (result.isFailure) {
                 errors += result.exceptionOrNull().toString()
                 break
             }
 
-            val rawXml = result.getOrDefault("")
-            books += parseBookEntries(rawXml, includeDescription)
-            nextUrl = extractNextPageUrl(rawXml, currentUrl)
+            val page = result.getOrThrow()
+            books += parseBookEntries(page.body, includeDescription, MIRROR_PLACEHOLDER_ORIGIN)
+                .map { it.resolveMirrorLinks(page.sourceUrl, page.mirrorOrigins) }
+            nextUrl = extractNextPageUrl(page.body, page.sourceUrl)
         }
 
         return McpResponse(payload = books.take(limit), errors = errors)
@@ -38,9 +42,13 @@ class OpdsExtractor(private val httpHelper: HttpClientInterface) {
 
     suspend fun searchAuthorsByName(authorName: String): McpResponse<List<AuthorSearchInfo>> {
         val url = buildSearchUrl("authors", authorName)
-        val result = httpHelper.queryGet(url)
+        val result = httpHelper.queryPage(url)
         return McpResponse(
-            payload = parseAuthorEntries(result.getOrDefault("")),
+            payload = result.getOrNull()?.let { page ->
+                parseAuthorEntries(page.body, MIRROR_PLACEHOLDER_ORIGIN).map {
+                    it.resolveMirrorLinks(page.sourceUrl, page.mirrorOrigins)
+                }
+            }.orEmpty(),
             errors = result.exceptionOrNull()?.let { listOf(it.toString()) }.orEmpty(),
         )
     }
@@ -69,9 +77,12 @@ class OpdsExtractor(private val httpHelper: HttpClientInterface) {
         limit: Int,
         includeDescription: Boolean,
     ): McpResponse<List<SearchBookInfo>> {
-        val (payloads, errors) = httpHelper.fetchMultiplePages(urls)
+        val (payloads, errors) = httpHelper.fetchPages(urls)
         return McpResponse(
-            payload = payloads.flatMap { parseBookEntries(it, includeDescription) }.take(limit),
+            payload = payloads.filterNotNull().flatMap { page ->
+                parseBookEntries(page.body, includeDescription, MIRROR_PLACEHOLDER_ORIGIN)
+                    .map { it.resolveMirrorLinks(page.sourceUrl, page.mirrorOrigins) }
+            }.take(limit),
             errors = errors,
         )
     }
@@ -93,7 +104,12 @@ class OpdsExtractor(private val httpHelper: HttpClientInterface) {
             ?.trim()
             ?.takeIf(String::isNotEmpty)
             ?: return null
-        return URI(currentUrl).resolve(href).toString()
+        val resolved = if (href.startsWith("?")) {
+            currentUrl.substringBefore('#').substringBefore('?') + href
+        } else {
+            runCatching { URI(currentUrl).resolve(href).toString() }.getOrNull() ?: return null
+        }
+        return resolved.takeIf { httpHelper.isAllowedMirrorUrl(it) }
     }
 
     private fun parseBookEntries(

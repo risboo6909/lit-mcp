@@ -2,11 +2,14 @@ package com.github.risboo6909.mcp.flibusta
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.github.risboo6909.utils.FetchedPage
 import com.github.risboo6909.utils.HttpClientInterface
+import com.github.risboo6909.utils.PageBatch
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
@@ -42,6 +45,21 @@ class FlibustaMcpArgumentsTest {
 
     private val client = HttpClient.newHttpClient()
     private var session: String? = null
+
+    @Test
+    fun searchReturnsMirrorUrlThroughMcp() {
+        val response = rpc(
+            "tools/call",
+            mapOf(
+                "name" to "flibustaSearchBooksByName",
+                "arguments" to
+                    mapOf("bookName" to "Fixture", "limit" to 1),
+            ),
+        )!!
+        val payload = mapper.readTree(response.path("result").path("content")[0].path("text").asText())
+        assertEquals("https://flibusta.site/b/46382", payload.path("payload")[0].path("url").asText())
+        assertFalse(response.toString().contains("flibusta-mirror.invalid"))
+    }
 
     @BeforeEach
     fun initialize() {
@@ -113,6 +131,29 @@ class FlibustaMcpArgumentsTest {
         @Primary
         fun fixtureHttpClient(): HttpClientInterface = object : HttpClientInterface {
             override suspend fun queryGet(url: String, retries: Int): Result<String> = Result.success(OPDS)
+
+            override suspend fun queryPage(url: String, retries: Int): Result<FetchedPage> = Result.success(
+                FetchedPage(
+                    OPDS,
+                    url.replace("https://flibusta.is", "https://flibusta.site"),
+                    setOf("https://flibusta.is", "https://flibusta.site", "https://flisland.net"),
+                ),
+            )
+
+            override suspend fun fetchPages(urls: List<String>, retries: Int): PageBatch = PageBatch(
+                urls.map { url ->
+                    FetchedPage(
+                        if (url.contains("/opds/")) OPDS else BOOK,
+                        url.replace("https://flibusta.is", "https://flibusta.site"),
+                        setOf("https://flibusta.is", "https://flibusta.site", "https://flisland.net"),
+                    )
+                },
+                emptyList(),
+            )
+
+            override fun preferredMirrorOrigin(): String = "https://flibusta.site"
+            override fun allowedMirrorOrigins(): Set<String> = setOf("https://flibusta.site")
+            override fun isAllowedMirrorUrl(url: String): Boolean = url.startsWith("https://flibusta.site/")
 
             override suspend fun fetchMultiplePages(
                 urls: List<String>,

@@ -7,6 +7,7 @@ import com.github.risboo6909.utils.HttpClientInterface
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.jsoup.Jsoup
+import java.net.URI
 import java.time.Duration
 
 class GenresListExtractor(private val httpHelper: HttpClientInterface) {
@@ -23,21 +24,37 @@ class GenresListExtractor(private val httpHelper: HttpClientInterface) {
 
     suspend fun getAllGenres(): McpResponse<List<GenreInfo>> {
         cache.getIfPresent(ALL_GENRES_CACHE_KEY)?.let { genres ->
-            return McpResponse(payload = genres)
+            return McpResponse(payload = resolveCachedGenres(genres))
         }
 
         return cacheMutex.withLock {
             cache.getIfPresent(ALL_GENRES_CACHE_KEY)?.let { genres ->
-                return@withLock McpResponse(payload = genres)
+                return@withLock McpResponse(payload = resolveCachedGenres(genres))
             }
 
             val response = fetchAllGenres()
             if (response.errors.isEmpty() && !response.payload.isNullOrEmpty()) {
-                cache.put(ALL_GENRES_CACHE_KEY, response.payload.toList())
+                cache.put(
+                    ALL_GENRES_CACHE_KEY,
+                    response.payload.map { genre ->
+                        if (httpHelper.isAllowedMirrorUrl(genre.url)) {
+                            val uri = URI(genre.url)
+                            genre.copy(
+                                url = MIRROR_PLACEHOLDER_ORIGIN + uri.rawPath.orEmpty() +
+                                    (uri.rawQuery?.let { "?$it" } ?: ""),
+                            )
+                        } else {
+                            genre
+                        }
+                    },
+                )
             }
             response
         }
     }
+
+    private fun resolveCachedGenres(genres: List<GenreInfo>): List<GenreInfo> =
+        genres.map { it.resolveMirrorLinks(httpHelper.preferredMirrorOrigin(), httpHelper.allowedMirrorOrigins()) }
 
     suspend fun getGenreCatalog(): McpResponse<Map<String, GenreInfo>> {
         val response = getAllGenres()
@@ -79,9 +96,14 @@ class GenresListExtractor(private val httpHelper: HttpClientInterface) {
     }
 
     private suspend fun fetchAllGenres(): McpResponse<List<GenreInfo>> {
-        val result = httpHelper.queryGet(GENRES_LIST_URL)
+        val result = httpHelper.queryPage(GENRES_LIST_URL)
         return McpResponse(
-            payload = parse(result.getOrDefault("")),
+            payload = result.getOrNull()?.let { page ->
+                parse(
+                    page.body,
+                    MIRROR_PLACEHOLDER_ORIGIN,
+                ).map { it.resolveMirrorLinks(page.sourceUrl, page.mirrorOrigins) }
+            }.orEmpty(),
             errors = result.exceptionOrNull()?.let {
                 listOf(it.toString())
             } ?: listOf(),

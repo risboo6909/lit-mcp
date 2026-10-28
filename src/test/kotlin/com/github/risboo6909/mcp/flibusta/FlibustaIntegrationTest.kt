@@ -4,6 +4,7 @@ import com.github.risboo6909.mcp.McpResponse
 import com.github.risboo6909.mcp.flibusta.extractors.BookDetails
 import com.github.risboo6909.utils.DEFAULT_HTTP_REQUEST_TIMEOUT_MILLIS
 import com.github.risboo6909.utils.HttpClient
+import com.github.risboo6909.utils.MirrorManager
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Assumptions.assumeTrue
@@ -23,7 +24,13 @@ class FlibustaIntegrationTest {
     fun getBookInfoById_fetchesAndParsesRealPage() = runBlocking {
         // Check network availability of flibusta.is by attempting a quick request
         // (a HEAD is not required — we use HttpClient.queryGet and accept that it may throw).
-        val httpClient = HttpClient(DEFAULT_HTTP_REQUEST_TIMEOUT_MILLIS)
+        val httpClient = HttpClient(
+            DEFAULT_HTTP_REQUEST_TIMEOUT_MILLIS,
+            MirrorManager(
+                listOf("https://flibusta.is", "https://flibusta.site", "https://flisland.net"),
+                setOf("https://flibusta.is"),
+            ),
+        )
 
         // Try a quick request to the site root; if it fails — skip the test
         val reachable = try {

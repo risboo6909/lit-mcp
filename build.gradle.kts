@@ -1,3 +1,5 @@
+import org.apache.tools.ant.filters.ReplaceTokens
+
 plugins {
     kotlin("jvm") version "2.0.0"
     kotlin("plugin.spring") version "2.0.0"
@@ -41,6 +43,14 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+tasks.processResources {
+    val buildVersion = project.version.toString()
+    inputs.property("buildVersion", buildVersion)
+    filesMatching("application.properties") {
+        filter<ReplaceTokens>("tokens" to mapOf("buildVersion" to buildVersion))
+    }
 }
 
 java {

@@ -17,7 +17,11 @@ class PopularBooksExtractor(
         val result = getWithPaginationParallel(
             url,
             httpHelper,
-            ::parse,
+            { page ->
+                parse(page.body, MIRROR_PLACEHOLDER_ORIGIN).map {
+                    it.resolveMirrorLinks(page.sourceUrl, page.mirrorOrigins)
+                }
+            },
             mapOf(),
             startPage,
             endPage,

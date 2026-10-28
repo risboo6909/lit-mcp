@@ -18,7 +18,10 @@ class RecommendationsExtractor(
         val result = getWithPaginationParallel(
             RECOMMENDATIONS_URL,
             httpHelper,
-            ::parseRecommendedBooks,
+            { page ->
+                parseRecommendedBooks(page.body, MIRROR_PLACEHOLDER_ORIGIN)
+                    .map { it.resolveMirrorLinks(page.sourceUrl, page.mirrorOrigins) }
+            },
             params,
             startPage,
             endPage,
@@ -47,7 +50,10 @@ class RecommendationsExtractor(
         val result = getWithPaginationParallel(
             RECOMMENDATIONS_URL,
             httpHelper,
-            ::parseRecommendedAuthors,
+            { page ->
+                parseRecommendedAuthors(page.body, MIRROR_PLACEHOLDER_ORIGIN)
+                    .map { it.resolveMirrorLinks(page.sourceUrl, page.mirrorOrigins) }
+            },
             params,
             startPage,
             endPage,
@@ -61,8 +67,11 @@ class RecommendationsExtractor(
         )
     }
 
-    private fun parseRecommendedAuthors(rawHtml: String): List<AuthorRecommendation> {
-        val doc: Document = Jsoup.parse(rawHtml)
+    private fun parseRecommendedAuthors(
+        rawHtml: String,
+        baseUrl: String = FLIBUSTA_BASE_URL,
+    ): List<AuthorRecommendation> {
+        val doc: Document = Jsoup.parse(rawHtml, baseUrl)
 
         val dataTable: Element = doc.select("form[name=formrecs] table").last() ?: return emptyList()
 

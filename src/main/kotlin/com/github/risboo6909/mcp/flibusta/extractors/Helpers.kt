@@ -1,5 +1,6 @@
 package com.github.risboo6909.mcp.flibusta.extractors
 
+import com.github.risboo6909.utils.FetchedPage
 import com.github.risboo6909.utils.HttpClientInterface
 import com.github.risboo6909.utils.addPagination
 import com.github.risboo6909.utils.joinKeyValueParams
@@ -22,7 +23,7 @@ data class PaginatedExtraction<T>(
 suspend fun <T> getWithPaginationParallel(
     url: String,
     httpHelper: HttpClientInterface,
-    parser: (String) -> List<T>,
+    parser: (FetchedPage) -> List<T>,
     params: Map<String, String>,
     startPage: Int,
     endPage: Int,
@@ -35,12 +36,12 @@ suspend fun <T> getWithPaginationParallel(
         addPagination(url, it)
     }
 
-    val (payloads, networkErrors) = httpHelper.fetchMultiplePages(urls)
-    payloads.forEach {
+    val (payloads, networkErrors) = httpHelper.fetchPages(urls)
+    payloads.filterNotNull().forEach {
         processRawHtml(allResults, parseErrors, url, it, parser)
     }
 
-    val pagerHtml = payloads.firstOrNull { it.isNotBlank() }
+    val pagerHtml = payloads.firstOrNull { !it?.body.isNullOrBlank() }?.body
     val (totalPages, pagerError) = if (pagerHtml == null) {
         null to "Failed to extract total pages: all fetched responses were empty"
     } else {
@@ -59,11 +60,11 @@ private fun <T> processRawHtml(
     allResults: MutableList<T>,
     allErrors: MutableList<String>,
     url: String,
-    rawHtml: String,
-    parser: (String) -> List<T>,
+    page: FetchedPage,
+    parser: (FetchedPage) -> List<T>,
 ) {
     val parsed = try {
-        parser(rawHtml)
+        parser(page)
     } catch (pe: Throwable) {
         logAndCollectError(
             LOG,
