@@ -88,12 +88,22 @@ policy.
 To override the runtime timeouts, set one or both variables on the installer process. The installer validates and saves
 them in the selected client configuration:
 
+Replace `TARGET` in either command with `codex`, `claude`, or `all`, as described above.
+
+#### macOS or Linux
+
+The variable assignments apply only to this installer process:
+
 ```bash
 curl -fsSL https://github.com/risboo6909/lit-mcp/releases/latest/download/install.sh |
   LIT_MCP_TOOL_TIMEOUT_MILLIS=600000 \
   LIT_MCP_HTTP_REQUEST_TIMEOUT_MILLIS=30000 \
   sh -s -- TARGET
 ```
+
+#### Windows PowerShell
+
+PowerShell's `$env:` assignments remain set in the current session after the installer exits.
 
 ```powershell
 $env:LIT_MCP_TOOL_TIMEOUT_MILLIS = "600000"
