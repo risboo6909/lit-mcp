@@ -155,15 +155,19 @@ Or run it in HTTP mode:
 java -jar lit-mcp.jar --transport=http
 ```
 
-Flibusta can occasionally respond slowly. The defaults are 300 seconds for a complete MCP tool call and 10 seconds for
-an individual HTTP request. The server tries `https://flibusta.is`, `https://flibusta.site`, and `https://flisland.net`
-when a mirror times out, cannot be reached, or returns HTTP 429 or 5xx. Other 4xx responses are returned immediately.
-The default retry budget is three attempts per page. Attempts move through the configured mirrors in preferred order;
-if the budget exceeds the number of mirrors, the server cycles through them again. With one mirror configured, it can
-therefore retry that mirror up to three times. The server prefers the last successful mirror until it retries the
-primary after five minutes. The mirrors are assumed to contain equivalent catalogs and download paths.
+### Configuration
 
-Override the timeouts or provide a comma-separated list of HTTPS mirror origins using environment variables:
+The server accepts the following command-line and environment options:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--transport` | `stdio` | MCP transport. Use `stdio` for local clients or `http` to run the HTTP server. |
+| `--port` | `8080` | HTTP server port; applies only with `--transport=http`. |
+| `LIT_MCP_TOOL_TIMEOUT_MILLIS` | `300000` (5 minutes) | Maximum time for one complete MCP tool call, in milliseconds. |
+| `LIT_MCP_HTTP_REQUEST_TIMEOUT_MILLIS` | `10000` (10 seconds) | Timeout for each outbound HTTP request, in milliseconds. |
+| `LIT_MCP_FLIBUSTA_MIRRORS` | `https://flibusta.is,https://flibusta.site,https://flisland.net` | Comma-separated, ordered list of Flibusta mirror origins. |
+
+Set environment variables in the MCP client configuration when it launches the server, or before running the JAR:
 
 ```bash
 LIT_MCP_TOOL_TIMEOUT_MILLIS=600000 \
@@ -172,9 +176,13 @@ LIT_MCP_FLIBUSTA_MIRRORS=https://flibusta.is,https://flibusta.site,https://flisl
 java -jar lit-mcp.jar --transport=stdio
 ```
 
-Set these variables in the MCP client configuration when the client launches the server. Mirror origins must be
-distinct HTTPS origins without paths, credentials, ports, query strings, or fragments. A single mirror disables switching
-to another origin; retries to that mirror still use the configured retry budget.
+Timeout values are positive integers. Mirror origins must be distinct HTTPS origins without paths, credentials, ports,
+query strings, or fragments. The server tries the configured mirrors when one times out, cannot be reached, or returns
+HTTP 429 or 5xx. Other 4xx responses are returned immediately. The default retry budget is three attempts per page,
+including the initial request, with a maximum of ten; this retry policy is currently fixed and has no environment
+variable. Attempts follow the preferred mirror order and cycle through the list if needed. With one mirror configured,
+retries still apply to that mirror. The last successful mirror remains preferred until the primary is retried after five
+minutes. Mirrors are assumed to provide equivalent catalogs and download paths.
 
 ## Contributing
 
