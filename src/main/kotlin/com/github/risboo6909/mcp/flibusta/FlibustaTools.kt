@@ -60,7 +60,8 @@ class FlibustaTools(
     @McpTool(
         name = "flibustaSearchBooksByName",
         title = "Flibusta Search Books By Name",
-        description = "[Flibusta/OPDS] Search books by name and return catalog metadata and download links",
+        description = "[Flibusta/OPDS] Search books by name and return catalog metadata and download links. " +
+            "Download links are not checked for file availability.",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
             openWorldHint = true,
@@ -197,7 +198,8 @@ class FlibustaTools(
         name = "flibustaGetBookInfoByIds",
         title = "Flibusta Get Book Info By IDs",
         description = "[Flibusta] Get book info by book ID. Returns each book's ID, URL, title, authors, genres, " +
-            "description, download links, and user rating. User discussions are opt-in.",
+            "description, download links, and user rating. User discussions are opt-in. " +
+            "Download links are not checked for file availability.",
         annotations = McpTool.McpAnnotations(
             readOnlyHint = true,
             openWorldHint = true,

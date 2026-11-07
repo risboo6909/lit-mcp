@@ -192,7 +192,14 @@ HTTP 429 or 5xx. Other 4xx responses are returned immediately. The default retry
 including the initial request, with a maximum of ten; this retry policy is currently fixed and has no environment
 variable. Attempts follow the preferred mirror order and cycle through the list if needed. With one mirror configured,
 retries still apply to that mirror. The last successful mirror remains preferred until the primary is retried after five
-minutes. Mirrors are assumed to provide equivalent catalogs and download paths.
+minutes. Mirrors are assumed to provide equivalent catalogs. `flisland.net` exposes metadata and discussions but does
+not serve book files. Card, author, cover, and genre links follow the mirror that served the catalog page. Download
+links follow that mirror only if it serves book files; for pages from `flisland.net`, they use the first full mirror in
+the configured list, or `https://flibusta.is` if the list contains only the catalog mirror. Book paths, IDs, and query
+parameters are preserved. Custom mirror origins are treated as full mirrors.
+
+Download links are catalog targets, not proof that a file is currently available. The server does not fetch book files
+or probe download endpoints while searching or reading cards; a link may still time out or return an error.
 
 ## Contributing
 

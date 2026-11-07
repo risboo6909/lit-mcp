@@ -5,6 +5,9 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
+// These origins expose metadata and discussions, but never book files.
+internal val FLIBUSTA_CATALOG_ONLY_ORIGINS = setOf("https://flisland.net", "http://flisland.net")
+
 @Configuration
 class FlibustaMirrorConfiguration {
     @Bean

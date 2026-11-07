@@ -6,6 +6,7 @@ import com.github.risboo6909.mcp.flibusta.extractors.OpdsExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksExtractor
 import com.github.risboo6909.mcp.flibusta.extractors.PopularBooksPeriod
 import com.github.risboo6909.mcp.flibusta.extractors.RecommendationsExtractor
+import com.github.risboo6909.mcp.flibusta.extractors.resolveDownloadUrl
 import com.github.risboo6909.mcp.flibusta.extractors.resolveMirrorUrl
 import com.github.risboo6909.utils.HttpClient
 import com.github.risboo6909.utils.MirrorManager
@@ -20,6 +21,120 @@ import org.junit.jupiter.api.Test
 import io.ktor.client.HttpClient as KtorHttpClient
 
 class MirrorLinksTest {
+    @Test
+    fun absoluteCatalogDownloadLinksUseFullPageMirrorEvenWhenCatalogMirrorIsNotConfigured() {
+        for (scheme in listOf("http", "https")) {
+            assertEquals(
+                "https://flibusta.site/b/397210/epub",
+                resolveDownloadUrl(
+                    "$scheme://flisland.net/b/397210/epub",
+                    "https://flibusta.site/b/397210",
+                    setOf("https://flibusta.site"),
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun catalogDownloadTargetsFollowConfiguredFullMirrorOrder() {
+        val origins = linkedSetOf("https://flisland.net", "https://books.example", "https://flibusta.is")
+        assertEquals(
+            "https://books.example/b/397210/fb2?download=1#book",
+            resolveDownloadUrl(
+                "https://flibusta.is/b/397210/fb2?download=1#book",
+                "https://flisland.net/b/397210",
+                origins,
+            ),
+        )
+        assertEquals(
+            "https://static.example/book.epub",
+            resolveDownloadUrl("https://static.example/book.epub", "https://flisland.net/b/397210", origins),
+        )
+    }
+
+    @Test
+    fun catalogOnlyConfigurationFallsBackToCanonicalDownloadOrigin() {
+        assertEquals(
+            "https://flibusta.is/b/397210/epub",
+            resolveDownloadUrl(
+                "https://flisland.net/b/397210/epub",
+                "https://flisland.net/b/397210",
+                setOf("https://flisland.net"),
+            ),
+        )
+    }
+
+    @Test
+    fun catalogBookDetailsKeepDiscussionsAndUseFullMirrorForFiles() = runBlocking {
+        val requests = mutableListOf<String>()
+        val engine = MockEngine { request ->
+            requests += request.url.toString()
+            when {
+                request.url.host != "flisland.net" -> respond("down", HttpStatusCode.ServiceUnavailable)
+                request.url.encodedPath == "/g" -> respond(
+                    """<h1 class="title">Список жанров</h1><ul><li><a href="/g/sf">Sci-fi</a></li></ul>""",
+                    HttpStatusCode.OK,
+                )
+                else -> respond(
+                    """<h1 class="title">Book</h1><a href="/a/5803">Author</a><div class="g-book">
+                        <a href="/b/397210/epub">epub</a><a href="/b/397210/fb2">fb2</a>
+                        <img alt="Cover image" src="/cover.jpg"/>
+                        <span class="container_1">Reader review</span></div>""",
+                    HttpStatusCode.OK,
+                )
+            }
+        }
+        val client = httpClient(engine)
+        try {
+            val book = BookInfoExtractor(client, GenresListExtractor(client))
+                .getBookInfoByIds(listOf(397210), true, 5).payload!!.single()
+            assertEquals("https://flisland.net/b/397210", book.url)
+            assertEquals("https://flisland.net/cover.jpg", book.coverUrl)
+            assertEquals(listOf("Reader review"), book.discussions)
+            assertEquals(
+                listOf("https://flibusta.is/b/397210/fb2", "https://flibusta.is/b/397210/epub"),
+                book.downloads!!.map { it.url },
+            )
+            assertEquals(true, requests.all { java.net.URI(it).path in listOf("/b/397210", "/g") })
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun catalogOnlyMirrorKeepsSearchMetadataButUsesFullMirrorForAcquisitions() = runBlocking {
+        val requests = mutableListOf<String>()
+        val engine = MockEngine { request ->
+            requests += request.url.toString()
+            if (request.url.host != "flisland.net") {
+                respond("down", HttpStatusCode.ServiceUnavailable)
+            } else {
+                respond(
+                    """<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>Book</title>
+                        <link href="/b/397210" rel="alternate"/>
+                        <author><name>Author</name><uri>/a/5803</uri></author>
+                        <link href="/b/397210/epub/opds?x=1" rel="http://opds-spec.org/acquisition/open-access"/>
+                        <link href="/b/397210/fb2/opds" rel="http://opds-spec.org/acquisition/open-access"/>
+                        </entry></feed>""",
+                    HttpStatusCode.OK,
+                )
+            }
+        }
+        val client = httpClient(engine)
+        try {
+            val book = OpdsExtractor(client).searchBooksByName("Book", 1, false).payload!!.single()
+            assertEquals("https://flisland.net/b/397210", book.url)
+            assertEquals("https://flisland.net/a/5803", book.authors!!.single().url)
+            assertEquals(
+                listOf("https://flibusta.is/b/397210/epub/opds?x=1", "https://flibusta.is/b/397210/fb2/opds"),
+                book.downloads!!.map { it.url },
+            )
+            assertEquals(3, requests.size, "Download availability must not be probed during catalog search")
+        } finally {
+            client.close()
+        }
+    }
+
     private fun httpClient(engine: MockEngine) = HttpClient(
         KtorHttpClient(engine) { expectSuccess = true },
         MirrorManager(

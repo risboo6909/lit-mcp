@@ -1,5 +1,6 @@
 package com.github.risboo6909.mcp.flibusta.extractors
 
+import com.github.risboo6909.mcp.flibusta.FLIBUSTA_CATALOG_ONLY_ORIGINS
 import java.net.URI
 
 internal const val MIRROR_PLACEHOLDER_ORIGIN = "https://flibusta-mirror.invalid"
@@ -24,11 +25,21 @@ internal fun resolveMirrorUrl(
         (uri.rawFragment?.let { "#$it" } ?: "")
 }
 
+internal fun resolveDownloadUrl(url: String, sourceUrl: String, origins: Set<String>): String {
+    val knownOrigins = origins + FLIBUSTA_CATALOG_ONLY_ORIGINS
+    val resolved = resolveMirrorUrl(url, sourceUrl, knownOrigins)
+    val uri = runCatching { URI(resolved) }.getOrNull() ?: return resolved
+    val origin = "${uri.scheme}://${uri.authority}"
+    if (origin !in FLIBUSTA_CATALOG_ONLY_ORIGINS) return resolved
+    val downloadOrigin = origins.firstOrNull { it !in FLIBUSTA_CATALOG_ONLY_ORIGINS } ?: FLIBUSTA_BASE_URL
+    return resolveMirrorUrl(resolved, downloadOrigin, knownOrigins + downloadOrigin)
+}
+
 internal fun SearchBookInfo.resolveMirrorLinks(sourceUrl: String, origins: Set<String>): SearchBookInfo = copy(
     url = resolveMirrorUrl(url, sourceUrl, origins),
     authors = authors?.map { it.copy(url = resolveMirrorUrl(it.url, sourceUrl, origins)) },
     coverUrl = coverUrl?.let { resolveMirrorUrl(it, sourceUrl, origins) },
-    downloads = downloads?.map { it.copy(url = resolveMirrorUrl(it.url, sourceUrl, origins)) },
+    downloads = downloads?.map { it.copy(url = resolveDownloadUrl(it.url, sourceUrl, origins)) },
 )
 
 internal fun AuthorSearchInfo.resolveMirrorLinks(sourceUrl: String, origins: Set<String>): AuthorSearchInfo = copy(
@@ -48,7 +59,7 @@ internal fun BookDetails.resolveMirrorLinks(sourceUrl: String, origins: Set<Stri
     url = resolveMirrorUrl(url, sourceUrl, origins),
     authors = authors?.map { it.resolveMirrorLinks(sourceUrl, origins) },
     genres = genres?.map { it.resolveMirrorLinks(sourceUrl, origins) },
-    downloads = downloads?.map { it.copy(url = resolveMirrorUrl(it.url, sourceUrl, origins)) },
+    downloads = downloads?.map { it.copy(url = resolveDownloadUrl(it.url, sourceUrl, origins)) },
     coverUrl = coverUrl?.let { resolveMirrorUrl(it, sourceUrl, origins) },
 )
 

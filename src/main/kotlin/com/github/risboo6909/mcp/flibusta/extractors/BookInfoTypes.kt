@@ -1,5 +1,6 @@
 package com.github.risboo6909.mcp.flibusta.extractors
 
+/** A catalog download target; file availability has not been verified. */
 data class DownloadLink(val format: String, val url: String)
 
 data class BookDetails(
