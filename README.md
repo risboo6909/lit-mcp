@@ -196,6 +196,26 @@ minutes. Mirrors are assumed to provide equivalent catalogs and download paths.
 
 ## Contributing
 
+After changing code, run `./gradlew spotlessCheck test`. For changes to startup, configuration, or transports, also run
+`./gradlew bootJar` and test the resulting JAR. On Windows PowerShell, use `./gradlew.bat` for these Gradle commands.
+
+To check that the stdio server keeps responding when tools finish concurrently, run the offline smoke test with
+Python 3 and Java on your PATH:
+
+```bash
+python3 scripts/smoke-test-stdio.py
+```
+
+On Windows PowerShell:
+
+```powershell
+py -3 scripts/smoke-test-stdio.py
+```
+
+The test starts `build/libs/lit-mcp-1.0.jar`, performs an MCP handshake, sends five batches of 100 validation-only
+tool calls, and checks that a subsequent ping succeeds. It does not contact Flibusta. Use `--jar /path/to/server.jar`
+to test another artifact, such as a build with a custom release version.
+
 Contributions are welcome! If you find any issues or have suggestions for improvements, please feel free to open an issue 
 or submit a pull request.
 
